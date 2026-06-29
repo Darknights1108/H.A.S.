@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "has-backend"
+version = "0.1.0"
+description = "Hiring Automation System — backend API"
+authors = ["HAS"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.32.0" }
+sqlalchemy = "^2.0.36"
+alembic = "^1.14.0"
+psycopg2-binary = "^2.9.10"
+pydantic-settings = "^2.6.0"
+apscheduler = "^3.10.4"
+anthropic = "^0.39.0"
+# 打分/简历解析阶段再加:langgraph、langchain-anthropic
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
