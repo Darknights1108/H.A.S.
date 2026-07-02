@@ -57,6 +57,9 @@ npm run dev
   - 申请表 `/apply`(公开),审查队列 `/admin/applications`(band、理由、Approve/Reject)
   - 理由生成:有 `ANTHROPIC_API_KEY` 用 Claude 润色,否则规则模板(可降级)
   - 超时无人审自动淘汰 + 婉拒信草稿(APScheduler,天数可配)
+- [x] 职位管理 `/admin/jobs`:贴 JD → AI 解析成筛选规则(chat box)→ 预览修改 → 创建
+  - 每个职位独立规则(`job.requirements`),打分动态执行;开/关职位
+  - AI 解析需 `ANTHROPIC_API_KEY`,无 key 时降级为手动填规则表单
 - [ ] 简历文件上传 + LLM 解析(依赖对象存储,加分项佐证用)
 - [ ] 邮件发送(目前只落草稿,SMTP 接入待做)
 - [ ] Admin 设置页

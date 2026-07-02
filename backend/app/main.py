@@ -8,6 +8,7 @@ from .config import settings
 from .routers.applications import router as applications_router
 from .routers.booking import router as booking_router
 from .routers.dev import router as dev_router
+from .routers.jobs import router as jobs_router
 from .routers.slots import interviewer_router, router as slots_router
 from .scheduler import shutdown_scheduler, start_scheduler
 
@@ -33,6 +34,7 @@ app.include_router(router, prefix="/api")
 app.include_router(slots_router, prefix="/api")
 app.include_router(interviewer_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")
+app.include_router(jobs_router, prefix="/api")
 app.include_router(booking_router, prefix="/api")
 app.include_router(dev_router, prefix="/api")  # dev only — remove before production
 
