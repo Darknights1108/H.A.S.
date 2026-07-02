@@ -52,8 +52,13 @@ npm run dev
   - 候选人页 `/booking/{token}`(免登录,凭 token)
   - 管理页 `/admin/slots`(生成时段网格、认领/撤回)
   - 确认/改期自动生成邮件草稿(发送待接入)
-- [ ] 打分引擎(简历解析 + 硬门槛/加分 → band)
-- [ ] 邮件发送(invite / offer / reject 模板 + SMTP)
+- [x] 打分引擎:提交即打分,硬门槛(knockout)+ 加分(bonus)→ High/Medium/Low
+  - High/Medium → shortlist(admin 审查后 Approve 草拟邀请信);Low → 自动婉拒 + talent bank
+  - 申请表 `/apply`(公开),审查队列 `/admin/applications`(band、理由、Approve/Reject)
+  - 理由生成:有 `ANTHROPIC_API_KEY` 用 Claude 润色,否则规则模板(可降级)
+  - 超时无人审自动淘汰 + 婉拒信草稿(APScheduler,天数可配)
+- [ ] 简历文件上传 + LLM 解析(依赖对象存储,加分项佐证用)
+- [ ] 邮件发送(目前只落草稿,SMTP 接入待做)
 - [ ] Admin 设置页
 - [ ] 真实会议链接(目前为 Jitsi 占位)
 ```

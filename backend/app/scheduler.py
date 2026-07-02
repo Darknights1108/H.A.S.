@@ -1,9 +1,10 @@
 """定时任务:每天扫描 shortlist,把超过配置天数无人审查的申请自动淘汰。"""
 
+import datetime
 import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import text
+from sqlalchemy import select
 
 from .database import SessionLocal
 
@@ -12,33 +13,42 @@ _scheduler: BackgroundScheduler | None = None
 
 
 def expire_stale_shortlist() -> int:
-    """status='shortlisted' 且 shortlisted_at 早于 (now - 配置天数) 的,转 rejected。
+    """status='shortlisted' 且 shortlisted_at 早于 (now - 配置天数) 的,转 rejected 并草拟婉拒信。
 
     天数从 app_setting.shortlist_review_days 读取,admin 改设置即时生效。
     """
+    from .models import Application, Candidate, Job
+    from .services.scheduling import draft_email, get_setting_int
+
     db = SessionLocal()
     try:
-        result = db.execute(
-            text(
-                """
-                UPDATE application a
-                SET status = 'rejected',
-                    rejected_reason = 'auto_no_review',
-                    updated_at = now()
-                FROM (
-                    SELECT (value #>> '{}')::int AS days
-                    FROM app_setting WHERE key = 'shortlist_review_days'
-                ) s
-                WHERE a.status = 'shortlisted'
-                  AND a.shortlisted_at < now() - make_interval(days => COALESCE(s.days, 7))
-                """
+        days = get_setting_int(db, "shortlist_review_days", 7)
+        cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
+        stale = db.scalars(
+            select(Application).where(
+                Application.status == "shortlisted",
+                Application.shortlisted_at < cutoff,
             )
-        )
+        ).all()
+        for app_ in stale:
+            candidate = db.get(Candidate, app_.candidate_id)
+            job = db.get(Job, app_.job_id)
+            app_.status = "rejected"
+            app_.rejected_reason = "auto_no_review"
+            draft_email(
+                db, app_, "reject",
+                f"Your application — {job.title}",
+                (
+                    f"Hi {candidate.name},\n\n"
+                    f"Thank you for applying to {job.title}. Unfortunately we are "
+                    f"unable to move forward with your application at this time.\n\n"
+                    f"We wish you all the best.\n"
+                ),
+            )
         db.commit()
-        count = result.rowcount or 0
-        if count:
-            logger.info("auto-expired %d shortlisted application(s)", count)
-        return count
+        if stale:
+            logger.info("auto-expired %d shortlisted application(s)", len(stale))
+        return len(stale)
     finally:
         db.close()
 

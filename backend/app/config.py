@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str | None = None
     # 逗号分隔的允许来源
     cors_origins: str = "http://localhost:3000"
+    # 候选人邮件里的预约链接前缀
+    frontend_base_url: str = "http://localhost:3000"
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -14,6 +14,7 @@ sqlalchemy = "^2.0.36"
 alembic = "^1.14.0"
 psycopg2-binary = "^2.9.10"
 pydantic-settings = "^2.6.0"
+email-validator = "^2.2.0"
 apscheduler = "^3.10.4"
 anthropic = "^0.39.0"
 # 打分/简历解析阶段再加:langgraph、langchain-anthropic
