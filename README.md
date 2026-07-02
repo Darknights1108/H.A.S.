@@ -61,7 +61,9 @@ npm run dev
   - 每个职位独立规则(`job.requirements`),打分动态执行;开/关职位
   - AI 解析需 `ANTHROPIC_API_KEY`,无 key 时降级为手动填规则表单
 - [ ] 简历文件上传 + LLM 解析(依赖对象存储,加分项佐证用)
-- [ ] 邮件发送(目前只落草稿,SMTP 接入待做)
+- [x] 邮件发送:Outbox `/admin/emails`(草稿预览 → 人工 Send);Gmail SMTP(App Password,`.env` 配 `SMTP_*`)
+  - 预约确认/改期信自动发送(纯事实性);邀请/婉拒/offer 走 Outbox 人工审核
+  - SMTP 未配置时草稿保留,页面有提示
 - [ ] Admin 设置页
 - [ ] 真实会议链接(目前为 Jitsi 占位)
 ```

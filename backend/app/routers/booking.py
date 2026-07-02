@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Application, Candidate, Interview, Interviewer, Slot, SlotInterviewer
+from ..services.mailer import try_send_draft
 from ..services.scheduling import (
     confirmation_email_body,
     draft_email,
@@ -163,7 +164,9 @@ def confirm(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     db.add(interview)
     app_.status = "scheduled"
     subject, body = confirmation_email_body(db, candidate, held, meeting_link, rescheduled=False)
-    draft_email(db, app_, "confirmation", subject, body)
+    email = draft_email(db, app_, "confirmation", subject, body)
+    db.flush()
+    try_send_draft(db, email)  # 纯事实性内容,自动发送;失败保留草稿可人工重发
     db.commit()
     return {
         "confirmed": True,
@@ -192,7 +195,9 @@ def reschedule(token: uuid.UUID, payload: RescheduleIn, db: Session = Depends(ge
     subject, body = confirmation_email_body(
         db, candidate, slot, interview.meeting_link, rescheduled=True
     )
-    draft_email(db, app_, "reschedule", subject, body)
+    email = draft_email(db, app_, "reschedule", subject, body)
+    db.flush()
+    try_send_draft(db, email)  # 同确认信:自动发送,失败保留草稿
     db.commit()
     return {
         "confirmed": True,
