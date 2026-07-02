@@ -16,6 +16,78 @@ type BookingState = {
   timezone: string;
 };
 
+const WEEKDAY_HEADERS = ["S", "M", "T", "W", "T", "F", "S"];
+
+function pad(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+/** 本月月历(固定,不可翻月):工作日且有空档才可选 */
+function MonthCalendar({
+  openDates,
+  activeDate,
+  onPick,
+}: {
+  openDates: Set<string>;
+  activeDate: string | null;
+  onPick: (d: string) => void;
+}) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-based
+  const todayKey = `${year}-${pad(month + 1)}-${pad(now.getDate())}`;
+  const firstWeekday = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = now.toLocaleString("en-US", { month: "long", year: "numeric" });
+
+  const cells: (number | null)[] = [
+    ...Array<null>(firstWeekday).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  return (
+    <div style={{ maxWidth: 340 }}>
+      <p style={{ fontWeight: 600, margin: "0 0 8px" }}>{monthLabel}</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+        {WEEKDAY_HEADERS.map((h, i) => (
+          <div key={i} style={{ textAlign: "center", color: "#888", fontSize: 12, padding: 4 }}>
+            {h}
+          </div>
+        ))}
+        {cells.map((d, i) => {
+          if (d === null) return <div key={`pad-${i}`} />;
+          const key = `${year}-${pad(month + 1)}-${pad(d)}`;
+          const weekday = new Date(year, month, d).getDay();
+          const isWeekend = weekday === 0 || weekday === 6;
+          const isPast = key < todayKey;
+          const available = openDates.has(key) && !isWeekend && !isPast;
+          const isActive = key === activeDate;
+          return (
+            <button
+              key={key}
+              disabled={!available}
+              onClick={() => onPick(key)}
+              style={{
+                padding: "8px 0",
+                borderRadius: "50%",
+                border: "none",
+                fontSize: 13,
+                cursor: available ? "pointer" : "default",
+                background: isActive ? "#334" : available ? "#eef" : "transparent",
+                color: isActive ? "#fff" : available ? "#334" : isWeekend || isPast ? "#ccc" : "#999",
+                fontWeight: available ? 600 : 400,
+              }}
+            >
+              {d}
+            </button>
+          );
+        })}
+      </div>
+      <p style={{ color: "#888", fontSize: 12 }}>Interviews are held on working days (Mon–Fri) only.</p>
+    </div>
+  );
+}
+
 export default function BookingPage() {
   const { token } = useParams<{ token: string }>();
   const [state, setState] = useState<BookingState | null>(null);
@@ -23,6 +95,7 @@ export default function BookingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [activeDate, setActiveDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [details, setDetails] = useState({ name: "", email: "", phone: "" });
 
   const load = useCallback(async () => {
     try {
@@ -30,6 +103,11 @@ export default function BookingPage() {
       if (!r.ok) throw new Error(r.status === 404 ? "Booking link not found" : `HTTP ${r.status}`);
       const data: BookingState = await r.json();
       setState(data);
+      setDetails({
+        name: data.candidate.name ?? "",
+        email: data.candidate.email ?? "",
+        phone: data.candidate.phone ?? "",
+      });
       setError(null);
       return data;
     } catch (e) {
@@ -42,16 +120,16 @@ export default function BookingPage() {
     load();
   }, [load]);
 
-  const dates = useMemo(() => {
-    if (!state) return [];
-    return Array.from(new Set(state.open_slots.map((s) => s.date))).sort();
-  }, [state]);
+  const openDates = useMemo(
+    () => new Set(state?.open_slots.map((s) => s.date) ?? []),
+    [state]
+  );
 
   useEffect(() => {
-    if (dates.length && (activeDate === null || !dates.includes(activeDate))) {
-      setActiveDate(dates[0]);
+    if (openDates.size && (activeDate === null || !openDates.has(activeDate))) {
+      setActiveDate([...openDates].sort()[0]);
     }
-  }, [dates, activeDate]);
+  }, [openDates, activeDate]);
 
   async function act(path: string, body?: object) {
     setBusy(true);
@@ -63,9 +141,7 @@ export default function BookingPage() {
         body: body ? JSON.stringify(body) : undefined,
       });
       const data = await r.json();
-      if (!r.ok) {
-        setNotice(data.detail ?? `HTTP ${r.status}`);
-      }
+      if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
       await load();
     } catch (e) {
       setNotice(String(e));
@@ -77,7 +153,7 @@ export default function BookingPage() {
   if (error) return <main style={wrap}><p style={{ color: "#b00" }}>{error}</p></main>;
   if (!state) return <main style={wrap}><p>Loading…</p></main>;
 
-  const { candidate, held_slot, confirmed, interview, open_slots } = state;
+  const { held_slot, confirmed, interview, open_slots } = state;
   const canReschedule =
     confirmed && interview && interview.reschedule_count < interview.reschedule_max;
   const pickable = !confirmed || canReschedule;
@@ -105,85 +181,98 @@ export default function BookingPage() {
         </section>
       )}
 
-      {!confirmed && held_slot && (
-        <section style={card}>
-          <h2 style={{ marginTop: 0 }}>Selected time (not confirmed yet)</h2>
-          <p>
-            <b>{held_slot.date} {held_slot.start}–{held_slot.end}</b>
-            {"  with "}{held_slot.interviewers.join(", ")}
-          </p>
-          <button style={primary} disabled={busy} onClick={() => act("confirm")}>
-            Confirm booking
-          </button>{" "}
-          <button style={secondary} disabled={busy} onClick={() => act("withdraw")}>
-            Withdraw &amp; pick another
-          </button>
-        </section>
-      )}
-
       {notice && <p style={{ color: "#b00" }}>{notice}</p>}
 
       {pickable && (
         <section>
           <h2>{confirmed ? "Reschedule — pick a new time" : "Pick a time"}</h2>
-          {dates.length === 0 && <p>No open slots right now — please check back later.</p>}
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-            {dates.map((d) => (
-              <button
-                key={d}
-                style={d === activeDate ? dateActive : dateBtn}
-                onClick={() => setActiveDate(d)}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, maxWidth: 480 }}>
-            {daySlots.map((s) => (
-              <button
-                key={s.id}
-                style={timeBtn}
-                disabled={busy}
-                title={`Panel: ${s.interviewers.join(", ")}`}
-                onClick={() =>
-                  confirmed
-                    ? act("reschedule", { slot_id: s.id })
-                    : act("select", { slot_id: s.id })
-                }
-              >
-                {s.start}
-              </button>
-            ))}
+          {open_slots.length === 0 && !held_slot && (
+            <p>No open slots right now — please check back later.</p>
+          )}
+          <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
+            <MonthCalendar openDates={openDates} activeDate={activeDate} onPick={setActiveDate} />
+            <div style={{ flex: 1, minWidth: 220 }}>
+              {activeDate && <p style={{ fontWeight: 600, margin: "0 0 8px" }}>{activeDate}</p>}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+                {held_slot && !confirmed && (
+                  <button style={timeActive} disabled>
+                    {held_slot.date === activeDate ? held_slot.start : `${held_slot.date} ${held_slot.start}`} ✓
+                  </button>
+                )}
+                {daySlots.map((s) => (
+                  <button
+                    key={s.id}
+                    style={timeBtn}
+                    disabled={busy}
+                    title={`Panel: ${s.interviewers.join(", ")}`}
+                    onClick={() =>
+                      confirmed
+                        ? act("reschedule", { slot_id: s.id })
+                        : act("select", { slot_id: s.id })
+                    }
+                  >
+                    {s.start}
+                  </button>
+                ))}
+              </div>
+              {held_slot && !confirmed && (
+                <p style={{ color: "#666", fontSize: 13 }}>
+                  Selected: {held_slot.date} {held_slot.start}–{held_slot.end}{" "}
+                  <button style={linkBtn} disabled={busy} onClick={() => act("withdraw")}>
+                    withdraw
+                  </button>
+                </p>
+              )}
+            </div>
           </div>
         </section>
       )}
 
-      <section style={{ ...card, marginTop: 24 }}>
-        <h2 style={{ marginTop: 0 }}>Your details</h2>
-        <p><b>Name:</b> {candidate.name}</p>
-        <p><b>Email:</b> {candidate.email}</p>
-        <p><b>Phone:</b> {candidate.phone ?? "—"}</p>
-      </section>
+      {!confirmed && held_slot && (
+        <section style={card}>
+          <h2 style={{ marginTop: 0 }}>Add your details</h2>
+          <label style={lbl}>First and last name *</label>
+          <input style={input} value={details.name}
+            onChange={(e) => setDetails({ ...details, name: e.target.value })} />
+          <label style={lbl}>Email *</label>
+          <input style={input} type="email" value={details.email}
+            onChange={(e) => setDetails({ ...details, email: e.target.value })} />
+          <label style={lbl}>Phone number *</label>
+          <input style={input} value={details.phone}
+            onChange={(e) => setDetails({ ...details, phone: e.target.value })} />
+          <p>
+            <button
+              style={primary}
+              disabled={busy || !details.name.trim() || !details.email.trim() || !details.phone.trim()}
+              onClick={() => act("confirm", details)}
+            >
+              {busy ? "Booking…" : "Confirm booking"}
+            </button>
+          </p>
+        </section>
+      )}
     </main>
   );
 }
 
-const wrap: React.CSSProperties = { maxWidth: 640, margin: "0 auto" };
+const wrap: React.CSSProperties = { maxWidth: 720, margin: "0 auto" };
 const card: React.CSSProperties = {
   border: "1px solid #ddd", borderRadius: 8, padding: "12px 16px", margin: "16px 0",
 };
-const dateBtn: React.CSSProperties = {
-  padding: "8px 12px", border: "1px solid #ccc", borderRadius: 6, background: "#fff", cursor: "pointer",
+const lbl: React.CSSProperties = { display: "block", marginTop: 12, fontWeight: 600 };
+const input: React.CSSProperties = {
+  display: "block", width: "100%", maxWidth: 420, padding: "8px 10px", marginTop: 4,
+  border: "1px solid #ccc", borderRadius: 6, boxSizing: "border-box",
 };
-const dateActive: React.CSSProperties = { ...dateBtn, background: "#334", color: "#fff" };
 const timeBtn: React.CSSProperties = {
   padding: "10px 0", border: "1px solid #ccc", borderRadius: 6, background: "#fff", cursor: "pointer",
 };
+const timeActive: React.CSSProperties = { ...timeBtn, background: "#334", color: "#fff", border: "none" };
 const primary: React.CSSProperties = {
-  padding: "10px 18px", border: "none", borderRadius: 6, background: "#334", color: "#fff", cursor: "pointer",
+  padding: "10px 22px", border: "none", borderRadius: 6, background: "#334", color: "#fff", cursor: "pointer",
 };
-const secondary: React.CSSProperties = {
-  padding: "10px 18px", border: "1px solid #ccc", borderRadius: 6, background: "#f5f5f5", cursor: "pointer",
+const linkBtn: React.CSSProperties = {
+  border: "none", background: "none", color: "#06c", cursor: "pointer", textDecoration: "underline", padding: 0,
 };
 const joinBtn: React.CSSProperties = {
   display: "inline-block", padding: "10px 18px", borderRadius: 6,

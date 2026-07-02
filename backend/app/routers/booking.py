@@ -9,7 +9,7 @@ import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -71,11 +71,15 @@ def get_booking(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     held = _held_slot(db, app_.candidate_id)
     interview = _active_interview(db, app_.id)
     today = datetime.date.today()
-    open_slots = db.scalars(
-        select(Slot)
-        .where(Slot.status == "open", Slot.slot_date >= today)
-        .order_by(Slot.slot_date, Slot.start_time)
-    ).all()
+    open_slots = [
+        s
+        for s in db.scalars(
+            select(Slot)
+            .where(Slot.status == "open", Slot.slot_date >= today)
+            .order_by(Slot.slot_date, Slot.start_time)
+        )
+        if s.slot_date.weekday() < 5  # 面试只在工作日(周一至五)
+    ]
     return {
         "candidate": {"name": candidate.name, "email": candidate.email, "phone": candidate.phone},
         "application_status": app_.status,
@@ -143,8 +147,18 @@ def withdraw(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     return {"held_slot": None}
 
 
+class ConfirmIn(BaseModel):
+    """候选人在确认时填写/修正的联系资料(Bookings 式 Add your details)。"""
+
+    name: str | None = None
+    email: EmailStr | None = None
+    phone: str | None = None
+
+
 @router.post("/{token}/confirm")
-def confirm(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def confirm(
+    token: uuid.UUID, payload: ConfirmIn | None = None, db: Session = Depends(get_db)
+) -> dict:
     app_ = _get_application(db, token)
     if _active_interview(db, app_.id):
         raise HTTPException(409, "already confirmed")
@@ -152,6 +166,21 @@ def confirm(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
     if held is None:
         raise HTTPException(409, "select a slot first")
     candidate = db.get(Candidate, app_.candidate_id)
+    # 更新候选人资料(email 变更需查重,它是身份键)
+    if payload:
+        if payload.email and payload.email != candidate.email:
+            taken = db.scalar(
+                select(Candidate).where(
+                    Candidate.email == payload.email, Candidate.id != candidate.id
+                )
+            )
+            if taken:
+                raise HTTPException(409, "this email is already used by another candidate")
+            candidate.email = payload.email
+        if payload.name and payload.name.strip():
+            candidate.name = payload.name.strip()
+        if payload.phone is not None:
+            candidate.phone = payload.phone.strip() or None
     # 占位会议链接;后续接 Google Meet / Teams 时替换
     meeting_link = f"https://meet.jit.si/HAS-{app_.booking_token}"
     interview = Interview(
