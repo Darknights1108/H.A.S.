@@ -89,7 +89,7 @@ def get_booking(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
             {
                 "meeting_link": interview.meeting_link,
                 "reschedule_count": interview.reschedule_count,
-                "reschedule_max": get_setting_int(db, "reschedule_max", 1),
+                "reschedule_max": get_setting_int(db, "reschedule_max", 0),  # 0 = 不限次
             }
             if interview
             else None
@@ -214,8 +214,8 @@ def reschedule(token: uuid.UUID, payload: RescheduleIn, db: Session = Depends(ge
     interview = _active_interview(db, app_.id)
     if interview is None:
         raise HTTPException(409, "no confirmed interview to reschedule")
-    max_ = get_setting_int(db, "reschedule_max", 1)
-    if interview.reschedule_count >= max_:
+    max_ = get_setting_int(db, "reschedule_max", 0)  # 0 = 不限次
+    if max_ > 0 and interview.reschedule_count >= max_:
         raise HTTPException(409, f"reschedule limit reached ({max_})")
     slot = _book_slot(db, app_, payload.slot_id)  # 内部会释放旧时段
     interview.slot_id = slot.id

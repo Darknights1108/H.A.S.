@@ -155,7 +155,8 @@ export default function BookingPage() {
 
   const { held_slot, confirmed, interview, open_slots } = state;
   const canReschedule =
-    confirmed && interview && interview.reschedule_count < interview.reschedule_max;
+    confirmed && interview &&
+    (interview.reschedule_max <= 0 || interview.reschedule_count < interview.reschedule_max);
   const pickable = !confirmed || canReschedule;
   const daySlots = open_slots.filter((s) => s.date === activeDate);
 
@@ -175,8 +176,10 @@ export default function BookingPage() {
             </a>
           </p>
           <p style={{ color: "#666" }}>
-            Reschedules used: {interview.reschedule_count}/{interview.reschedule_max}
-            {canReschedule && " — pick a new time below to reschedule."}
+            {interview.reschedule_max > 0
+              ? `Reschedules used: ${interview.reschedule_count}/${interview.reschedule_max}`
+              : "Need a different time?"}
+            {canReschedule && " Pick a new time below to reschedule."}
           </p>
         </section>
       )}
