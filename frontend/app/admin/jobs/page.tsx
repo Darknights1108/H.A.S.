@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import AdminBar from "@/components/AdminBar";
+import { useSession } from "@/lib/session";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type JobRow = {
   id: string; title: string; description: string | null;
@@ -32,6 +35,7 @@ const emptyDraft = {
 };
 
 export default function AdminJobsPage() {
+  const { session, loading: authLoading } = useSession(true);
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [jdText, setJdText] = useState("");
   const [draft, setDraft] = useState(emptyDraft);
@@ -147,8 +151,11 @@ export default function AdminJobsPage() {
     await load();
   }
 
+  if (authLoading || !session) return <main><p>Loading…</p></main>;
+
   return (
     <main style={{ maxWidth: 860 }}>
+      <AdminBar session={session} />
       <h1>Jobs admin</h1>
 
       <section style={card}>

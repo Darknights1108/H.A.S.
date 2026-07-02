@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import AdminBar from "@/components/AdminBar";
+import { useSession } from "@/lib/session";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type EmailRow = {
   id: string; type: string; to: string; candidate_name: string;
@@ -11,6 +14,7 @@ type EmailRow = {
 };
 
 export default function AdminEmailsPage() {
+  const { session, loading: authLoading } = useSession(true);
   const [emails, setEmails] = useState<EmailRow[]>([]);
   const [smtpConfigured, setSmtpConfigured] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -44,8 +48,11 @@ export default function AdminEmailsPage() {
     }
   }
 
+  if (authLoading || !session) return <main><p>Loading…</p></main>;
+
   return (
     <main style={{ maxWidth: 900 }}>
+      <AdminBar session={session} />
       <h1>Email outbox</h1>
       {!smtpConfigured && (
         <p style={{ background: "#fff8e1", border: "1px solid #f0d264", borderRadius: 6, padding: "8px 12px" }}>

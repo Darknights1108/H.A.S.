@@ -64,6 +64,10 @@ npm run dev
 - [x] 邮件发送:Outbox `/admin/emails`(草稿预览 → 人工 Send);Gmail SMTP(App Password,`.env` 配 `SMTP_*`)
   - 预约确认/改期信自动发送(纯事实性);邀请/婉拒/offer 走 Outbox 人工审核
   - SMTP 未配置时草稿保留,页面有提示
+- [x] 认证:Magic Link(免密码)+ 邮箱白名单 + Session Cookie(详见 `docs/auth-magic-link.md`)
+  - 登录页 `/login`;白名单管理 `/admin/allowlist`(角色/启停/审计)
+  - 面试官登入后只能以自己身份认领时段;admin 才能进审查/职位/邮件页
+  - 首个 admin 由 `ADMIN_EMAIL` 环境变量启动时写入
 - [ ] Admin 设置页
 - [ ] 真实会议链接(目前为 Jitsi 占位)
 ```

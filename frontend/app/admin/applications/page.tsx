@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import AdminBar from "@/components/AdminBar";
+import { useSession } from "@/lib/session";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type Row = {
   id: string;
@@ -21,6 +24,7 @@ type Row = {
 };
 
 export default function AdminApplicationsPage() {
+  const { session, loading: authLoading } = useSession(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -47,8 +51,11 @@ export default function AdminApplicationsPage() {
     await load();
   }
 
+  if (authLoading || !session) return <main><p>Loading…</p></main>;
+
   return (
     <main style={{ maxWidth: 1000 }}>
+      <AdminBar session={session} />
       <h1>Applications review</h1>
       {notice && <p style={{ color: "#06c", wordBreak: "break-all" }}>{notice}</p>}
       <table style={{ borderCollapse: "collapse", width: "100%" }}>

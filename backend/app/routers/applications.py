@@ -16,9 +16,10 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth import require_admin
 from ..config import settings
 from ..database import get_db
-from ..models import Application, Candidate, Job, Score
+from ..models import Application, Candidate, Job, Score, UserSession
 from ..services.scheduling import draft_email
 from ..services.scoring import score_application
 
@@ -124,7 +125,8 @@ def submit_application(payload: ApplicationIn, db: Session = Depends(get_db)) ->
 # ---------- admin review ----------
 
 @router.get("/applications")
-def list_applications(db: Session = Depends(get_db)) -> list[dict]:
+def list_applications(db: Session = Depends(get_db),
+                      _admin: UserSession = Depends(require_admin)) -> list[dict]:
     rows = db.execute(
         select(Application, Candidate, Score, Job)
         .join(Candidate, Candidate.id == Application.candidate_id)
@@ -154,7 +156,8 @@ def list_applications(db: Session = Depends(get_db)) -> list[dict]:
 
 
 @router.post("/applications/{application_id}/approve")
-def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db),
+                        _admin: UserSession = Depends(require_admin)) -> dict:
     app_ = db.get(Application, application_id)
     if app_ is None:
         raise HTTPException(404, "application not found")
@@ -184,7 +187,8 @@ class RejectIn(BaseModel):
 
 @router.post("/applications/{application_id}/reject")
 def reject_application(
-    application_id: uuid.UUID, payload: RejectIn, db: Session = Depends(get_db)
+    application_id: uuid.UUID, payload: RejectIn, db: Session = Depends(get_db),
+    _admin: UserSession = Depends(require_admin),
 ) -> dict:
     app_ = db.get(Application, application_id)
     if app_ is None:

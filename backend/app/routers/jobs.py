@@ -17,8 +17,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth import require_admin
 from ..database import get_db
-from ..models import Job
+from ..models import Job, UserSession
 from ..services import llm
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,8 @@ class ParseIn(BaseModel):
 
 
 @router.post("/parse")
-def parse_requirements(payload: ParseIn, db: Session = Depends(get_db)) -> dict:
+def parse_requirements(payload: ParseIn, db: Session = Depends(get_db),
+                       _admin: UserSession = Depends(require_admin)) -> dict:
     if llm.provider() is None:
         raise HTTPException(
             503,
@@ -126,7 +128,8 @@ class JobIn(BaseModel):
 
 
 @router.post("", status_code=201)
-def create_job(payload: JobIn, db: Session = Depends(get_db)) -> dict:
+def create_job(payload: JobIn, db: Session = Depends(get_db),
+               _admin: UserSession = Depends(require_admin)) -> dict:
     job = Job(
         title=payload.title,
         description=payload.description,
@@ -146,7 +149,8 @@ class JobPatch(BaseModel):
 
 
 @router.patch("/{job_id}")
-def update_job(job_id: uuid.UUID, payload: JobPatch, db: Session = Depends(get_db)) -> dict:
+def update_job(job_id: uuid.UUID, payload: JobPatch, db: Session = Depends(get_db),
+               _admin: UserSession = Depends(require_admin)) -> dict:
     job = db.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")
@@ -163,7 +167,8 @@ def update_job(job_id: uuid.UUID, payload: JobPatch, db: Session = Depends(get_d
 
 
 @router.get("/all")
-def list_all_jobs(db: Session = Depends(get_db)) -> list[dict]:
+def list_all_jobs(db: Session = Depends(get_db),
+                  _admin: UserSession = Depends(require_admin)) -> list[dict]:
     jobs = db.scalars(select(Job).order_by(Job.created_at.desc())).all()
     return [
         {

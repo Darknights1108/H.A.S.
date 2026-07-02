@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import AdminBar from "@/components/AdminBar";
+import { useSession } from "@/lib/session";
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type Interviewer = { id: string; name: string; email: string };
 type SlotRow = {
   id: string; date: string; start: string; end: string; status: string;
   interviewers: { id: string; name: string }[];
+  candidate_name: string | null;
 };
 
 function isoDate(d: Date) {
@@ -15,6 +19,7 @@ function isoDate(d: Date) {
 }
 
 export default function AdminSlotsPage() {
+  const { session, loading: authLoading } = useSession(false);
   const today = new Date();
   const in14 = new Date(today.getTime() + 14 * 86400000);
   const [startDate, setStartDate] = useState(isoDate(today));
@@ -55,15 +60,24 @@ export default function AdminSlotsPage() {
     await load();
   }
 
+  const isAdmin = session?.role === "admin";
+  // 非 admin：身份 = 自己；请求体不带 interviewer_id（后端从会话解析）
+  const actingId = isAdmin ? selected : session?.interviewer_id ?? "";
+  const idBody = isAdmin ? { interviewer_id: selected } : {};
+
   const byDate = slots.reduce<Record<string, SlotRow[]>>((acc, s) => {
     (acc[s.date] ??= []).push(s);
     return acc;
   }, {});
 
+  if (authLoading || !session) return <main><p>Loading…</p></main>;
+
   return (
     <main style={{ maxWidth: 900 }}>
-      <h1>Slots admin</h1>
+      <AdminBar session={session} />
+      <h1>{isAdmin ? "Slots admin" : "My interview slots"}</h1>
 
+      {isAdmin && (
       <section style={card}>
         <h2 style={{ marginTop: 0 }}>Interviewers</h2>
         <p>{interviewers.map((i) => i.name).join(", ") || "none yet"}</p>
@@ -89,25 +103,28 @@ export default function AdminSlotsPage() {
           </select>
         </p>
       </section>
+      )}
 
       <section style={card}>
         <h2 style={{ marginTop: 0 }}>Slot grid</h2>
         <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={input} />{" "}
         →{" "}
         <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={input} />{" "}
-        <button
-          style={btn}
-          onClick={() => api("POST", "/slots/generate", { start_date: startDate, end_date: endDate })}
-        >
-          Generate hourly slots (Mon–Fri 9–18)
-        </button>
-        {selected && (
+        {isAdmin && (
+          <button
+            style={btn}
+            onClick={() => api("POST", "/slots/generate", { start_date: startDate, end_date: endDate })}
+          >
+            Generate hourly slots (Mon–Fri 9–18)
+          </button>
+        )}
+        {actingId && (
           <p style={{ marginBottom: 0 }}>
             <button
               style={{ ...btn, background: "#0a6" }}
               onClick={() =>
                 api("POST", "/slots/claim-bulk", {
-                  interviewer_id: selected, start_date: startDate, end_date: endDate,
+                  ...idBody, start_date: startDate, end_date: endDate,
                 })
               }
             >
@@ -117,7 +134,7 @@ export default function AdminSlotsPage() {
               style={{ ...btn, background: "#b33" }}
               onClick={() =>
                 api("POST", "/slots/withdraw-bulk", {
-                  interviewer_id: selected, start_date: startDate, end_date: endDate,
+                  ...idBody, start_date: startDate, end_date: endDate,
                 })
               }
             >
@@ -133,13 +150,13 @@ export default function AdminSlotsPage() {
         <section key={date} style={card}>
           <h3 style={{ marginTop: 0 }}>
             {date}{" "}
-            {selected && (
+            {actingId && (
               <>
                 <button
                   style={{ ...btnSm, background: "#0a6" }}
                   onClick={() =>
                     api("POST", "/slots/claim-bulk", {
-                      interviewer_id: selected, start_date: date, end_date: date,
+                      ...idBody, start_date: date, end_date: date,
                     })
                   }
                 >
@@ -149,7 +166,7 @@ export default function AdminSlotsPage() {
                   style={{ ...btnSm, background: "#b33" }}
                   onClick={() =>
                     api("POST", "/slots/withdraw-bulk", {
-                      interviewer_id: selected, start_date: date, end_date: date,
+                      ...idBody, start_date: date, end_date: date,
                     })
                   }
                 >
@@ -162,12 +179,12 @@ export default function AdminSlotsPage() {
             <thead>
               <tr>
                 <th style={th}>Time</th><th style={th}>Status</th>
-                <th style={th}>Panel</th><th style={th}>Actions</th>
+                <th style={th}>Panel</th><th style={th}>Candidate</th><th style={th}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((s) => {
-                const mine = s.interviewers.some((i) => i.id === selected);
+                const mine = s.interviewers.some((i) => i.id === actingId);
                 return (
                   <tr key={s.id}>
                     <td style={td}>{s.start}–{s.end}</td>
@@ -175,14 +192,15 @@ export default function AdminSlotsPage() {
                       <span style={{ ...badge, ...badgeColor[s.status] }}>{s.status}</span>
                     </td>
                     <td style={td}>{s.interviewers.map((i) => i.name).join(", ") || "—"}</td>
+                    <td style={td}>{s.candidate_name ?? "—"}</td>
                     <td style={td}>
-                      {selected && !mine && (
-                        <button style={btnSm} onClick={() => api("POST", `/slots/${s.id}/claim`, { interviewer_id: selected })}>
+                      {actingId && !mine && (
+                        <button style={btnSm} onClick={() => api("POST", `/slots/${s.id}/claim`, idBody)}>
                           Claim
                         </button>
                       )}
-                      {selected && mine && (
-                        <button style={btnSm} onClick={() => api("DELETE", `/slots/${s.id}/claim/${selected}`)}>
+                      {actingId && mine && (
+                        <button style={btnSm} onClick={() => api("DELETE", `/slots/${s.id}/claim/${actingId}`)}>
                           Withdraw
                         </button>
                       )}

@@ -6,16 +6,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth import require_admin
 from ..config import settings
 from ..database import get_db
-from ..models import Application, Candidate, EmailLog
+from ..models import Application, Candidate, EmailLog, UserSession
 from ..services.mailer import send_draft
 
 router = APIRouter(prefix="/emails", tags=["emails"])
 
 
 @router.get("")
-def list_emails(db: Session = Depends(get_db)) -> dict:
+def list_emails(db: Session = Depends(get_db),
+                _admin: UserSession = Depends(require_admin)) -> dict:
     rows = db.execute(
         select(EmailLog, Candidate)
         .join(Application, Application.id == EmailLog.application_id)
@@ -42,7 +44,8 @@ def list_emails(db: Session = Depends(get_db)) -> dict:
 
 
 @router.post("/{email_id}/send")
-def send_email(email_id: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+def send_email(email_id: uuid.UUID, db: Session = Depends(get_db),
+               _admin: UserSession = Depends(require_admin)) -> dict:
     email = db.get(EmailLog, email_id)
     if email is None:
         raise HTTPException(404, "email not found")

@@ -29,6 +29,9 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-ansonangzhenloong@gmail.com}
+      # 仅开发:request-link 响应直接带链接,便于测试;生产必须删除
+      DEBUG_EXPOSE_MAGIC_LINK: ${DEBUG_EXPOSE_MAGIC_LINK:-true}
     ports:
       - "8000:8000"
     depends_on:
@@ -39,7 +42,9 @@ services:
     build:
       context: ./frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      # 留空 = 走 Next 同源代理(/api → backend),session cookie 才能工作
+      NEXT_PUBLIC_API_URL: ""
+      BACKEND_URL: http://backend:8000
     ports:
       - "3000:3000"
     depends_on:

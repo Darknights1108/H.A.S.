@@ -134,6 +134,50 @@ class Score(Base):
     created_at: Mapped[datetime.datetime] = _now()
 
 
+class AllowedEmail(Base):
+    __tablename__ = "allowed_email"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name: Mapped[str | None] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'user'"))
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    added_by: Mapped[str | None] = mapped_column(Text)
+    added_at: Mapped[datetime.datetime] = _now()
+    verified_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class LoginToken(Base):
+    __tablename__ = "login_token"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    request_ip: Mapped[str | None] = mapped_column(Text)
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime.datetime] = _now()
+
+
+class UserSession(Base):
+    __tablename__ = "user_session"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime.datetime] = _now()
+    expires_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AuthLog(Base):
+    __tablename__ = "auth_log"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    event: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str | None] = mapped_column(Text)
+    ip: Mapped[str | None] = mapped_column(Text)
+    detail: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime.datetime] = _now()
+
+
 class Interviewer(Base):
     __tablename__ = "interviewer"
     id: Mapped[uuid.UUID] = _uuid_pk()
