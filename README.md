@@ -48,8 +48,12 @@ npm run dev
 
 - [x] 数据模型 + schema
 - [x] 脚手架(最小闭环:前端 → 后端 → DB)
+- [x] 排期模块:面试官认领 / 候选人选时段(hold→确认→限次改期)/ 并发行锁
+  - 候选人页 `/booking/{token}`(免登录,凭 token)
+  - 管理页 `/admin/slots`(生成时段网格、认领/撤回)
+  - 确认/改期自动生成邮件草稿(发送待接入)
 - [ ] 打分引擎(简历解析 + 硬门槛/加分 → band)
-- [ ] 排期 API(面试官认领 / 候选人选时段 / 撤回改选)
-- [ ] 邮件草稿(invite / offer / reject)
+- [ ] 邮件发送(invite / offer / reject 模板 + SMTP)
 - [ ] Admin 设置页
+- [ ] 真实会议链接(目前为 Jitsi 占位)
 ```

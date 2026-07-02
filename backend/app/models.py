@@ -34,7 +34,10 @@ interview_status = ENUM(
     "scheduled", "completed", "passed", "failed", "cancelled",
     name="interview_status", create_type=False,
 )
-email_type = ENUM("invite", "offer", "reject", name="email_type", create_type=False)
+email_type = ENUM(
+    "invite", "confirmation", "reschedule", "offer", "reject",
+    name="email_type", create_type=False,
+)
 email_status = ENUM("draft", "sent", name="email_status", create_type=False)
 
 _uuid_pk = lambda: mapped_column(  # noqa: E731
@@ -106,6 +109,10 @@ class Application(Base):
     )
     shortlisted_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True))
     rejected_reason: Mapped[str | None] = mapped_column(Text)
+    booking_token: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, unique=True,
+        server_default=text("gen_random_uuid()"),
+    )
     submitted_at: Mapped[datetime.datetime] = _now()
     updated_at: Mapped[datetime.datetime] = _now()
 
