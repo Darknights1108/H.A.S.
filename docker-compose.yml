@@ -23,6 +23,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://has:has@db:5432/has
       CORS_ORIGINS: http://localhost:3000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

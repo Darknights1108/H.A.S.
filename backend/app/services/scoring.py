@@ -16,13 +16,12 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..models import Application, Job, Score
+from . import llm
 
 logger = logging.getLogger(__name__)
 
 RULES_VERSION = "rules-v1"
-LLM_MODEL = "claude-haiku-4-5"
 
 
 def _knockout_checks(app_: Application, ko: dict) -> dict[str, dict]:
@@ -87,33 +86,14 @@ def _template_reasoning(
     return "\n".join(lines)
 
 
-def _llm_reasoning(template: str, band: str) -> str | None:
-    """有 API key 时让 Claude 把规则结果写成一段简洁的评审说明;失败则返回 None 走模板。"""
-    if not settings.anthropic_api_key:
-        return None
-    try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        msg = client.messages.create(
-            model=LLM_MODEL,
-            max_tokens=300,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "You are a hiring screening assistant. Rewrite the following "
-                        "rule-based screening result as a concise, neutral 2-4 sentence "
-                        "explanation for an admin reviewer. Do not change any facts or "
-                        f"the band ({band}).\n\n{template}"
-                    ),
-                }
-            ],
-        )
-        return msg.content[0].text.strip()
-    except Exception as e:  # 网络/额度等问题一律降级,不阻塞打分
-        logger.warning("LLM reasoning failed, falling back to template: %s", e)
-        return None
+def _llm_reasoning(template: str, band: str) -> tuple[str, str] | None:
+    """有 LLM key 时把规则结果润色成简洁评审说明,返回 (文本, 模型);失败返回 None 走模板。"""
+    return llm.complete_text(
+        "You are a hiring screening assistant. Rewrite the following "
+        "rule-based screening result as a concise, neutral 2-4 sentence "
+        "explanation for an admin reviewer. Do not change any facts or "
+        f"the band ({band}).\n\n{template}"
+    )
 
 
 def score_application(db: Session, app_: Application) -> Score:
@@ -129,7 +109,7 @@ def score_application(db: Session, app_: Application) -> Score:
     band = "low" if not knockout_passed else ("high" if total >= high_min else "medium")
 
     template = _template_reasoning(knockout, bonus, band, total)
-    llm_text = _llm_reasoning(template, band)
+    polished = _llm_reasoning(template, band)
 
     score = Score(
         application_id=app_.id,
@@ -137,8 +117,8 @@ def score_application(db: Session, app_: Application) -> Score:
         band=band,
         total_score=total,
         breakdown={"knockout": knockout, "bonus": bonus, "high_min_bonus": high_min},
-        reasoning=llm_text or template,
-        model=LLM_MODEL if llm_text else RULES_VERSION,
+        reasoning=polished[0] if polished else template,
+        model=polished[1] if polished else RULES_VERSION,
     )
     db.add(score)
     return score

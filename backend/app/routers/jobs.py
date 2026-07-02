@@ -9,7 +9,6 @@
 打分引擎按 job.requirements 动态执行,新职位创建后立即生效,无需改代码。
 """
 
-import json
 import logging
 import uuid
 
@@ -18,14 +17,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..database import get_db
 from ..models import Job
+from ..services import llm
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
-
-PARSE_MODEL = "claude-sonnet-4-6"
 
 # 解析目标词汇表:必须与 services/scoring.py 的检查逻辑保持一致
 PARSE_TOOL = {
@@ -84,36 +81,25 @@ class ParseIn(BaseModel):
 
 @router.post("/parse")
 def parse_requirements(payload: ParseIn, db: Session = Depends(get_db)) -> dict:
-    if not settings.anthropic_api_key:
+    if llm.provider() is None:
         raise HTTPException(
             503,
-            "ANTHROPIC_API_KEY not configured — fill the rules manually below, "
-            "or set the key in backend .env / docker compose to enable AI parsing",
+            "No LLM API key configured (ANTHROPIC_API_KEY or OPENAI_API_KEY) — "
+            "fill the rules manually below, or set a key in .env to enable AI parsing",
         )
     try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        msg = client.messages.create(
-            model=PARSE_MODEL,
-            max_tokens=1500,
-            tools=[PARSE_TOOL],
-            tool_choice={"type": "tool", "name": "submit_screening_rules"},
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        "Extract screening rules from this job description. The application "
-                        "form has FIXED fields (CGPA, degree field, full-time status, "
-                        "programming languages, SQL knowledge, AI study, extra-curriculars), "
-                        "so map requirements onto the tool schema and put anything that "
-                        "doesn't fit into 'unmapped'.\n\n---\n" + payload.text
-                    ),
-                }
-            ],
+        draft, model = llm.tool_call(
+            prompt=(
+                "Extract screening rules from this job description. The application "
+                "form has FIXED fields (CGPA, degree field, full-time status, "
+                "programming languages, SQL knowledge, AI study, extra-curriculars), "
+                "so map requirements onto the tool schema and put anything that "
+                "doesn't fit into 'unmapped'.\n\n---\n" + payload.text
+            ),
+            tool_name=PARSE_TOOL["name"],
+            description=PARSE_TOOL["description"],
+            schema=PARSE_TOOL["input_schema"],
         )
-        block = next(b for b in msg.content if b.type == "tool_use")
-        draft = block.input
     except HTTPException:
         raise
     except Exception as e:
@@ -129,7 +115,7 @@ def parse_requirements(payload: ParseIn, db: Session = Depends(get_db)) -> dict:
             "high_min_bonus": draft.get("high_min_bonus", 15),
         },
         "unmapped": draft.get("unmapped", []),
-        "model": PARSE_MODEL,
+        "model": model,
     }
 
 

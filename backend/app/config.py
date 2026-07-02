@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     # 本地默认值;docker 里通过环境变量覆盖(host = db)
     database_url: str = "postgresql+psycopg2://has:has@localhost:5432/has"
     anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
     # 逗号分隔的允许来源
     cors_origins: str = "http://localhost:3000"
     # 候选人邮件里的预约链接前缀
