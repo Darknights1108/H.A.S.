@@ -8,7 +8,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
@@ -125,6 +125,85 @@ def list_slots(
         }
         for s in slots
     ]
+
+
+# ---------- bulk claim / withdraw ----------
+
+class BulkClaimIn(BaseModel):
+    interviewer_id: uuid.UUID
+    start_date: datetime.date
+    end_date: datetime.date
+
+
+@router.post("/claim-bulk")
+def claim_bulk(payload: BulkClaimIn, db: Session = Depends(get_db)) -> dict:
+    """认领范围内所有可认领的时段(跳过:已被订、已认领过、panel 已满)。"""
+    if db.get(Interviewer, payload.interviewer_id) is None:
+        raise HTTPException(404, "interviewer not found")
+    cap = get_setting_int(db, "panel_max_interviewers", 5)
+    slots = db.scalars(
+        select(Slot)
+        .where(Slot.slot_date.between(payload.start_date, payload.end_date))
+        .with_for_update()
+    ).all()
+    counts = dict(
+        db.execute(
+            select(SlotInterviewer.slot_id, func.count())
+            .where(SlotInterviewer.slot_id.in_([s.id for s in slots] or [None]))
+            .group_by(SlotInterviewer.slot_id)
+        ).all()
+    )
+    mine = set(
+        db.scalars(
+            select(SlotInterviewer.slot_id).where(
+                SlotInterviewer.interviewer_id == payload.interviewer_id
+            )
+        )
+    )
+    claimed, skipped = 0, 0
+    for slot in slots:
+        if slot.status == "booked" or slot.id in mine or counts.get(slot.id, 0) >= cap:
+            skipped += 1
+            continue
+        db.add(SlotInterviewer(slot_id=slot.id, interviewer_id=payload.interviewer_id))
+        slot.status = "open"
+        claimed += 1
+    db.commit()
+    return {"claimed": claimed, "skipped": skipped}
+
+
+@router.post("/withdraw-bulk")
+def withdraw_bulk(payload: BulkClaimIn, db: Session = Depends(get_db)) -> dict:
+    """撤回范围内该面试官的所有认领(跳过:已被订且自己是最后一位面试官的时段)。"""
+    rows = db.execute(
+        select(SlotInterviewer, Slot)
+        .join(Slot, Slot.id == SlotInterviewer.slot_id)
+        .where(
+            SlotInterviewer.interviewer_id == payload.interviewer_id,
+            Slot.slot_date.between(payload.start_date, payload.end_date),
+        )
+        .with_for_update()
+    ).all()
+    slot_ids = [s.id for _, s in rows]
+    counts = dict(
+        db.execute(
+            select(SlotInterviewer.slot_id, func.count())
+            .where(SlotInterviewer.slot_id.in_(slot_ids or [None]))
+            .group_by(SlotInterviewer.slot_id)
+        ).all()
+    )
+    withdrawn, skipped = 0, 0
+    for claim, slot in rows:
+        if slot.status == "booked" and counts.get(slot.id, 0) <= 1:
+            skipped += 1  # booked 时段不能退到 0 面试官
+            continue
+        db.delete(claim)
+        counts[slot.id] = counts.get(slot.id, 1) - 1
+        if slot.status != "booked":
+            slot.status = "open" if counts[slot.id] > 0 else "empty"
+        withdrawn += 1
+    db.commit()
+    return {"withdrawn": withdrawn, "skipped": skipped}
 
 
 # ---------- claim / withdraw ----------

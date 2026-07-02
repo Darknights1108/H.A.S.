@@ -101,13 +101,63 @@ export default function AdminSlotsPage() {
         >
           Generate hourly slots (Mon–Fri 9–18)
         </button>
+        {selected && (
+          <p style={{ marginBottom: 0 }}>
+            <button
+              style={{ ...btn, background: "#0a6" }}
+              onClick={() =>
+                api("POST", "/slots/claim-bulk", {
+                  interviewer_id: selected, start_date: startDate, end_date: endDate,
+                })
+              }
+            >
+              Claim all in range
+            </button>{" "}
+            <button
+              style={{ ...btn, background: "#b33" }}
+              onClick={() =>
+                api("POST", "/slots/withdraw-bulk", {
+                  interviewer_id: selected, start_date: startDate, end_date: endDate,
+                })
+              }
+            >
+              Withdraw all in range
+            </button>
+          </p>
+        )}
       </section>
 
       {notice && <p style={{ color: "#b00" }}>{notice}</p>}
 
       {Object.entries(byDate).map(([date, rows]) => (
         <section key={date} style={card}>
-          <h3 style={{ marginTop: 0 }}>{date}</h3>
+          <h3 style={{ marginTop: 0 }}>
+            {date}{" "}
+            {selected && (
+              <>
+                <button
+                  style={{ ...btnSm, background: "#0a6" }}
+                  onClick={() =>
+                    api("POST", "/slots/claim-bulk", {
+                      interviewer_id: selected, start_date: date, end_date: date,
+                    })
+                  }
+                >
+                  Claim day
+                </button>{" "}
+                <button
+                  style={{ ...btnSm, background: "#b33" }}
+                  onClick={() =>
+                    api("POST", "/slots/withdraw-bulk", {
+                      interviewer_id: selected, start_date: date, end_date: date,
+                    })
+                  }
+                >
+                  Withdraw day
+                </button>
+              </>
+            )}
+          </h3>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <thead>
               <tr>
