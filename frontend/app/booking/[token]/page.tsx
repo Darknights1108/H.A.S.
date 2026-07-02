@@ -96,6 +96,7 @@ export default function BookingPage() {
   const [activeDate, setActiveDate] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [details, setDetails] = useState({ name: "", email: "", phone: "" });
+  const [showReschedule, setShowReschedule] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -142,6 +143,7 @@ export default function BookingPage() {
       });
       const data = await r.json();
       if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
+      else if (path === "reschedule") setShowReschedule(false); // 改期成功后收起日历
       await load();
     } catch (e) {
       setNotice(String(e));
@@ -157,7 +159,7 @@ export default function BookingPage() {
   const canReschedule =
     confirmed && interview &&
     (interview.reschedule_max <= 0 || interview.reschedule_count < interview.reschedule_max);
-  const pickable = !confirmed || canReschedule;
+  const pickable = !confirmed || (canReschedule && showReschedule);
   const daySlots = open_slots.filter((s) => s.date === activeDate);
 
   return (
@@ -175,12 +177,21 @@ export default function BookingPage() {
               Join your appointment
             </a>
           </p>
-          <p style={{ color: "#666" }}>
-            {interview.reschedule_max > 0
-              ? `Reschedules used: ${interview.reschedule_count}/${interview.reschedule_max}`
-              : "Need a different time?"}
-            {canReschedule && " Pick a new time below to reschedule."}
-          </p>
+          {interview.reschedule_max > 0 && (
+            <p style={{ color: "#666" }}>
+              Reschedules used: {interview.reschedule_count}/{interview.reschedule_max}
+            </p>
+          )}
+          {canReschedule && (
+            <p>
+              <button
+                style={secondary}
+                onClick={() => setShowReschedule((v) => !v)}
+              >
+                {showReschedule ? "Cancel reschedule" : "Reschedule"}
+              </button>
+            </p>
+          )}
         </section>
       )}
 
