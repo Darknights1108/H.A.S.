@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from ..auth import require_admin
 from ..config import settings
 from ..database import get_db
-from ..models import Application, Candidate, Job, Score, UserSession
+from ..models import Application, Candidate, Interview, Job, Score, Slot, UserSession
 from ..services.scheduling import draft_email
 from ..services.scoring import score_application
 
@@ -134,6 +134,15 @@ def list_applications(db: Session = Depends(get_db),
         .outerjoin(Score, Score.application_id == Application.id)
         .order_by(Application.submitted_at.desc())
     ).all()
+    # 各申请当前排定的面试(用于显示时间 + Pass/Fail 操作)
+    itv_map = {
+        i.application_id: (i, sl)
+        for i, sl in db.execute(
+            select(Interview, Slot)
+            .join(Slot, Slot.id == Interview.slot_id)
+            .where(Interview.status == "scheduled")
+        )
+    }
     return [
         {
             "id": str(a.id),
@@ -150,6 +159,16 @@ def list_applications(db: Session = Depends(get_db),
             "reasoning": s.reasoning if s else None,
             "booking_url": f"{settings.frontend_base_url}/booking/{a.booking_token}",
             "submitted_at": a.submitted_at.isoformat(),
+            "interview": (
+                {
+                    "date": itv_map[a.id][1].slot_date.isoformat(),
+                    "start": itv_map[a.id][1].start_time.strftime("%H:%M"),
+                    "end": itv_map[a.id][1].end_time.strftime("%H:%M"),
+                    "meeting_link": itv_map[a.id][0].meeting_link,
+                }
+                if a.id in itv_map
+                else None
+            ),
         }
         for a, c, s, j in rows
     ]
@@ -179,6 +198,76 @@ def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)
     )
     db.commit()
     return {"application_id": str(app_.id), "invite_email_id": str(email.id), "booking_url": booking_url}
+
+
+class OutcomeIn(BaseModel):
+    result: str  # passed | failed
+
+
+@router.post("/applications/{application_id}/outcome")
+def record_outcome(
+    application_id: uuid.UUID, payload: OutcomeIn, db: Session = Depends(get_db),
+    _admin: UserSession = Depends(require_admin),
+) -> dict:
+    """面试结果:passed → offer 信草稿;failed → 婉拒信草稿 + talent bank。"""
+    if payload.result not in ("passed", "failed"):
+        raise HTTPException(422, "result must be 'passed' or 'failed'")
+    app_ = db.get(Application, application_id)
+    if app_ is None:
+        raise HTTPException(404, "application not found")
+    interview = db.scalar(
+        select(Interview).where(
+            Interview.application_id == application_id,
+            Interview.status == "scheduled",
+        )
+    )
+    if interview is None:
+        raise HTTPException(409, "no scheduled interview for this application")
+    candidate = db.get(Candidate, app_.candidate_id)
+    job = db.get(Job, app_.job_id)
+
+    interview.status = payload.result
+    if payload.result == "passed":
+        app_.status = "passed"
+        email = draft_email(
+            db, app_, "offer",
+            f"Congratulations — {job.title}",
+            (
+                f"Hi {candidate.name},\n\n"
+                f"Congratulations! We are pleased to inform you that you have "
+                f"passed the interview for {job.title}.\n\n"
+                f"Our team will follow up shortly with the offer details and "
+                f"next steps (start date, documents, onboarding).\n\n"
+                f"Welcome aboard!\n"
+            ),
+        )
+    else:
+        app_.status = "rejected"
+        app_.rejected_reason = "interview_failed"
+        email = draft_email(
+            db, app_, "reject",
+            f"Your interview result — {job.title}",
+            (
+                f"Hi {candidate.name},\n\n"
+                f"Thank you for taking the time to interview for {job.title}. "
+                f"After careful consideration, we will not be moving forward "
+                f"with your application.\n\n"
+                + (
+                    "Your profile remains in our talent bank and we may reach "
+                    "out when a suitable opportunity opens.\n\n"
+                    if candidate.consent_talent_bank
+                    else ""
+                )
+                + "We wish you all the best in your career.\n"
+            ),
+        )
+    db.commit()
+    return {
+        "application_id": str(app_.id),
+        "status": app_.status,
+        "interview_status": interview.status,
+        "email_draft_id": str(email.id),
+    }
 
 
 class RejectIn(BaseModel):

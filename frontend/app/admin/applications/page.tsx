@@ -21,6 +21,7 @@ type Row = {
   reasoning: string | null;
   booking_url: string;
   submitted_at: string;
+  interview: { date: string; start: string; end: string; meeting_link: string | null } | null;
 };
 
 export default function AdminApplicationsPage() {
@@ -51,6 +52,24 @@ export default function AdminApplicationsPage() {
     await load();
   }
 
+  async function outcome(id: string, result: "passed" | "failed") {
+    setNotice(null);
+    const r = await fetch(`${API}/api/applications/${id}/outcome`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ result }),
+    });
+    const data = await r.json();
+    if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
+    else
+      setNotice(
+        result === "passed"
+          ? "已标记通过 — offer 信草稿已生成,请到 Emails 页审核发送"
+          : "已标记未通过 — 婉拒信草稿已生成,请到 Emails 页审核发送"
+      );
+    await load();
+  }
+
   if (authLoading || !session) return <main><p>Loading…</p></main>;
 
   return (
@@ -63,7 +82,7 @@ export default function AdminApplicationsPage() {
           <tr>
             <th style={th}>Candidate</th><th style={th}>Job</th><th style={th}>CGPA</th>
             <th style={th}>Band</th><th style={th}>Score</th><th style={th}>Status</th>
-            <th style={th}>Actions</th>
+            <th style={th}>Interview</th><th style={th}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -87,6 +106,18 @@ export default function AdminApplicationsPage() {
                   )}
                 </td>
                 <td style={td}>
+                  {r.interview ? (
+                    <>
+                      {r.interview.date}
+                      <div style={{ color: "#888", fontSize: 12 }}>
+                        {r.interview.start}–{r.interview.end}
+                      </div>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td style={td}>
                   <button style={btnSm} onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
                     Why?
                   </button>{" "}
@@ -100,11 +131,21 @@ export default function AdminApplicationsPage() {
                       </button>
                     </>
                   )}
+                  {r.status === "scheduled" && r.interview && (
+                    <>
+                      <button style={{ ...btnSm, background: "#0a6" }} onClick={() => outcome(r.id, "passed")}>
+                        Pass
+                      </button>{" "}
+                      <button style={{ ...btnSm, background: "#b33" }} onClick={() => outcome(r.id, "failed")}>
+                        Fail
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
               {expanded === r.id && (
                 <tr key={r.id + "-detail"}>
-                  <td style={{ ...td, background: "#fafafa" }} colSpan={7}>
+                  <td style={{ ...td, background: "#fafafa" }} colSpan={8}>
                     <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontSize: 13 }}>
                       {r.reasoning ?? "no score"}
                     </pre>

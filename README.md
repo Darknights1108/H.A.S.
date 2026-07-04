@@ -64,6 +64,9 @@ npm run dev
 - [x] 邮件发送:Outbox `/admin/emails`(草稿预览 → 人工 Send);Gmail SMTP(App Password,`.env` 配 `SMTP_*`)
   - 预约确认/改期信自动发送(纯事实性);邀请/婉拒/offer 走 Outbox 人工审核
   - SMTP 未配置时草稿保留,页面有提示
+- [x] 面试结果处理:admin 在审查页对已排面试标记 Pass / Fail
+  - Pass → application=passed + offer 信草稿;Fail → rejected(interview_failed)+ 婉拒信草稿(留 talent bank)
+  - 草稿进 Outbox 人工审核发送;pipeline 全链路闭环
 - [x] 认证:Magic Link(免密码)+ 邮箱白名单 + Session Cookie(详见 `docs/auth-magic-link.md`)
   - 登录页 `/login`;白名单管理 `/admin/allowlist`(角色/启停/审计)
   - 面试官登入后只能以自己身份认领时段;admin 才能进审查/职位/邮件页
