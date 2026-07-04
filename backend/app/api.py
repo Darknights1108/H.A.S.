@@ -23,6 +23,7 @@ SETTING_RULES: dict[str, dict] = {
     "slot_duration_minutes": {"type": "int", "min": 15, "max": 240},
     "panel_max_interviewers": {"type": "int", "min": 1, "max": 20},
     "reschedule_max": {"type": "int", "min": 0, "max": 20},  # 0 = 不限次
+    "candidate_response_days": {"type": "int", "min": 1, "max": 90},
     "company_name": {"type": "str", "min_len": 1, "max_len": 80},
 }
 

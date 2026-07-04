@@ -15,13 +15,45 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Application, Candidate, Interview, Interviewer, Slot, SlotInterviewer
-from ..services.mailer import try_send_draft
+import logging
+
+from ..services.mailer import send_raw, try_send_draft
 from ..services.scheduling import (
     confirmation_email_body,
     draft_email,
     get_setting_int,
     release_slot,
+    slot_label,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _notify_panel(db: Session, slot: Slot, candidate: Candidate,
+                  meeting_link: str | None, rescheduled: bool) -> int:
+    """通知该时段的 panel 面试官有新预约;尽力发送,失败不影响预约流程。"""
+    emails = db.scalars(
+        select(Interviewer.email)
+        .join(SlotInterviewer, SlotInterviewer.interviewer_id == Interviewer.id)
+        .where(SlotInterviewer.slot_id == slot.id)
+    ).all()
+    verb = "rescheduled to" if rescheduled else "booked"
+    subject = f"Interview {verb} {slot_label(slot)} — {candidate.name}"
+    body = (
+        f"Hi,\n\n"
+        f"{candidate.name} ({candidate.email}) has {verb} your interview slot.\n\n"
+        f"When: {slot_label(slot)}\n"
+        f"Join link: {meeting_link or 'TBA'}\n\n"
+        f"You can view your schedule in the HAS dashboard.\n"
+    )
+    sent = 0
+    for em in emails:
+        try:
+            send_raw(em, subject, body)
+            sent += 1
+        except Exception as e:
+            logger.info("panel notification to %s skipped: %s", em, e)
+    return sent
 
 router = APIRouter(prefix="/booking", tags=["booking"])
 
@@ -197,10 +229,12 @@ def confirm(
     db.flush()
     try_send_draft(db, email)  # 纯事实性内容,自动发送;失败保留草稿可人工重发
     db.commit()
+    notified = _notify_panel(db, held, candidate, meeting_link, rescheduled=False)
     return {
         "confirmed": True,
         "meeting_link": meeting_link,
         "slot": _slot_view(db, held),
+        "interviewers_notified": notified,
     }
 
 
@@ -228,9 +262,11 @@ def reschedule(token: uuid.UUID, payload: RescheduleIn, db: Session = Depends(ge
     db.flush()
     try_send_draft(db, email)  # 同确认信:自动发送,失败保留草稿
     db.commit()
+    notified = _notify_panel(db, slot, candidate, interview.meeting_link, rescheduled=True)
     return {
         "confirmed": True,
         "slot": _slot_view(db, slot),
         "reschedule_count": interview.reschedule_count,
         "reschedule_max": max_,
+        "interviewers_notified": notified,
     }

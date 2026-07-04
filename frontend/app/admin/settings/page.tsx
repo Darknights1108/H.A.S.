@@ -17,6 +17,7 @@ const LABELS: Record<string, string> = {
   slot_duration_minutes: "面试时段长度(分钟)",
   panel_max_interviewers: "单时段面试官上限(panel)",
   reschedule_max: "改期次数上限(0 = 不限)",
+  candidate_response_days: "候选人响应期限(天,邀请发出后未预约则淘汰)",
   company_name: "公司名(信件署名)",
 };
 
