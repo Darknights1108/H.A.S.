@@ -13,12 +13,48 @@ from sqlalchemy.orm import Session
 from ..models import AppSetting, Candidate, Job
 
 
-def get_company_name(db: Session, default: str = "HAS") -> str:
-    row = db.get(AppSetting, "company_name")
-    if row is None:
+def get_setting_str(db: Session, key: str, default: str) -> str:
+    row = db.get(AppSetting, key)
+    if row is None or not row.value:
         return default
-    value = row.value
-    return str(value).strip('"') if value else default
+    return str(row.value)
+
+
+def get_company_name(db: Session, default: str = "HAS") -> str:
+    return get_setting_str(db, "company_name", default).strip('"')
+
+
+def _render(template: str, mapping: dict[str, str]) -> str:
+    """逐个替换占位符;未知的 {xxx} 原样保留,不会崩。"""
+    for k, v in mapping.items():
+        template = template.replace("{" + k + "}", str(v))
+    return template
+
+
+DEFAULT_INVITE_SUBJECT = "Interview invitation — {job_title}"
+DEFAULT_INVITE_BODY = (
+    "Hi {candidate_name},\n\n"
+    "Congratulations! You have been shortlisted for {job_title}.\n\n"
+    "Please pick an interview time that suits you using your personal "
+    "booking link:\n{booking_url}\n\n"
+    "All interviews are conducted online (times in MYT, UTC+08:00).\n\n"
+    "Best Regards,\n{company_name} Recruiting Team\n"
+)
+
+
+def invite_email(
+    db: Session, candidate: Candidate, job: Job, booking_url: str
+) -> tuple[str, str]:
+    """邀请信:主题/正文模板均可在 admin settings 编辑。"""
+    mapping = {
+        "candidate_name": candidate.name,
+        "job_title": job.title,
+        "booking_url": booking_url,
+        "company_name": get_company_name(db),
+    }
+    subject = _render(get_setting_str(db, "invite_email_subject", DEFAULT_INVITE_SUBJECT), mapping)
+    body = _render(get_setting_str(db, "invite_email_template", DEFAULT_INVITE_BODY), mapping)
+    return subject, body
 
 
 def rejection_email(

@@ -45,7 +45,11 @@ INSERT INTO app_setting (key, value, description) VALUES
     ('panel_max_interviewers', '5',   '单个时段最多面试官数(panel 上限)'),
     ('reschedule_max',        '0',    '确认后允许改期的最大次数(0 = 不限次)'),
     ('company_name',          '"HAS"', '候选人信件署名中的公司名'),
-    ('candidate_response_days', '7',   '邀请发出后候选人多少天未预约则自动淘汰')
+    ('candidate_response_days', '7',   '邀请发出后候选人多少天未预约则自动淘汰'),
+    ('work_start_hour',       '9',    '时段生成的工作时间起点(小时,MYT)'),
+    ('work_end_hour',         '18',   '时段生成的工作时间终点(小时,不含)'),
+    ('invite_email_subject',  '"Interview invitation — {job_title}"', '邀请信主题(支持占位符)'),
+    ('invite_email_template', '"Hi {candidate_name},\n\nCongratulations! You have been shortlisted for {job_title}.\n\nPlease pick an interview time that suits you using your personal booking link:\n{booking_url}\n\nAll interviews are conducted online (times in MYT, UTC+08:00).\n\nBest Regards,\n{company_name} Recruiting Team\n"', '邀请信正文模板,占位符:{candidate_name} {job_title} {booking_url} {company_name}')
 ON CONFLICT (key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------

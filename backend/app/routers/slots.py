@@ -64,21 +64,30 @@ def list_interviewers(db: Session = Depends(get_db),
 class GenerateSlotsIn(BaseModel):
     start_date: datetime.date
     end_date: datetime.date          # 含当天
-    start_hour: int = 9              # 工作时间起(MYT)
-    end_hour: int = 18               # 工作时间止(不含)
+    start_hour: int | None = None    # 缺省读 app_setting.work_start_hour
+    end_hour: int | None = None      # 缺省读 app_setting.work_end_hour
     skip_weekends: bool = True
 
 
 @router.post("/generate", status_code=201)
 def generate_slots(payload: GenerateSlotsIn, db: Session = Depends(get_db),
                    _admin: UserSession = Depends(require_admin)) -> dict:
-    """按固定时长生成 empty 时段网格;已存在的(同日期同起点)跳过。"""
+    """按固定时长生成 empty 时段网格;已存在的(同日期同起点)跳过。
+
+    工作时间范围默认取设置(work_start_hour / work_end_hour),请求可显式覆盖。
+    """
     if payload.end_date < payload.start_date:
         raise HTTPException(422, "end_date must be >= start_date")
     if (payload.end_date - payload.start_date).days > 31:
         raise HTTPException(422, "range too large (max 31 days)")
-    if not (0 <= payload.start_hour < payload.end_hour <= 24):
-        raise HTTPException(422, "invalid hour range")
+    start_hour = payload.start_hour if payload.start_hour is not None else get_setting_int(db, "work_start_hour", 9)
+    end_hour = payload.end_hour if payload.end_hour is not None else get_setting_int(db, "work_end_hour", 18)
+    if not (0 <= start_hour < end_hour <= 24):
+        raise HTTPException(
+            422,
+            f"invalid working-hour range ({start_hour}-{end_hour}) — "
+            f"check work_start_hour/work_end_hour in Settings",
+        )
 
     duration_min = get_setting_int(db, "slot_duration_minutes", 60)
     existing = {
@@ -95,8 +104,8 @@ def generate_slots(payload: GenerateSlotsIn, db: Session = Depends(get_db),
         if payload.skip_weekends and day.weekday() >= 5:
             day += datetime.timedelta(days=1)
             continue
-        cursor = datetime.datetime.combine(day, datetime.time(payload.start_hour, 0))
-        day_end = datetime.datetime.combine(day, datetime.time(payload.end_hour - 1, 59))
+        cursor = datetime.datetime.combine(day, datetime.time(start_hour, 0))
+        day_end = datetime.datetime.combine(day, datetime.time(end_hour - 1, 59))
         while cursor + datetime.timedelta(minutes=duration_min) <= day_end + datetime.timedelta(minutes=1):
             start_t = cursor.time()
             if (day, start_t) not in existing:

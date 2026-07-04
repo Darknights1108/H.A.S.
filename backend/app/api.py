@@ -24,7 +24,11 @@ SETTING_RULES: dict[str, dict] = {
     "panel_max_interviewers": {"type": "int", "min": 1, "max": 20},
     "reschedule_max": {"type": "int", "min": 0, "max": 20},  # 0 = 不限次
     "candidate_response_days": {"type": "int", "min": 1, "max": 90},
+    "work_start_hour": {"type": "int", "min": 0, "max": 23},
+    "work_end_hour": {"type": "int", "min": 1, "max": 24},
     "company_name": {"type": "str", "min_len": 1, "max_len": 80},
+    "invite_email_subject": {"type": "str", "min_len": 1, "max_len": 200},
+    "invite_email_template": {"type": "str", "min_len": 1, "max_len": 4000, "multiline": True},
 }
 
 
@@ -38,6 +42,7 @@ def list_settings(db: Session = Depends(get_db),
             "value": r.value,
             "description": r.description,
             "type": SETTING_RULES.get(r.key, {}).get("type", "str"),
+            "multiline": SETTING_RULES.get(r.key, {}).get("multiline", False),
             "updated_at": r.updated_at.isoformat(),
         }
         for r in rows

@@ -22,7 +22,7 @@ from ..database import get_db
 from ..models import Application, Candidate, Interview, Job, Score, Slot, UserSession
 from ..services.scheduling import draft_email
 from ..services.scoring import score_application
-from ..services.templates import offer_email, rejection_email
+from ..services.templates import invite_email, offer_email, rejection_email
 
 router = APIRouter(tags=["applications"])
 
@@ -172,17 +172,8 @@ def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)
     candidate = db.get(Candidate, app_.candidate_id)
     job = db.get(Job, app_.job_id)
     booking_url = f"{settings.frontend_base_url}/booking/{app_.booking_token}"
-    email = draft_email(
-        db, app_, "invite",
-        f"Interview invitation — {job.title}",
-        (
-            f"Hi {candidate.name},\n\n"
-            f"Congratulations! You have been shortlisted for {job.title}.\n\n"
-            f"Please pick an interview time that suits you using your personal "
-            f"booking link:\n{booking_url}\n\n"
-            f"All interviews are conducted online (times in MYT, UTC+08:00).\n"
-        ),
-    )
+    subject, body = invite_email(db, candidate, job, booking_url)
+    email = draft_email(db, app_, "invite", subject, body)
     db.commit()
     return {"application_id": str(app_.id), "invite_email_id": str(email.id), "booking_url": booking_url}
 

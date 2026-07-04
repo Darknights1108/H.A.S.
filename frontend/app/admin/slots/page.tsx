@@ -115,7 +115,7 @@ export default function AdminSlotsPage() {
             style={btn}
             onClick={() => api("POST", "/slots/generate", { start_date: startDate, end_date: endDate })}
           >
-            Generate hourly slots (Mon–Fri 9–18)
+            Generate hourly slots(工作日,时间范围见 Settings)
           </button>
         )}
         {actingId && (

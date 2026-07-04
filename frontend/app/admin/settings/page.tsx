@@ -9,6 +9,7 @@ type Setting = {
   value: number | string;
   description: string | null;
   type: "int" | "str";
+  multiline: boolean;
   updated_at: string;
 };
 
@@ -18,8 +19,16 @@ const LABELS: Record<string, string> = {
   panel_max_interviewers: "单时段面试官上限(panel)",
   reschedule_max: "改期次数上限(0 = 不限)",
   candidate_response_days: "候选人响应期限(天,邀请发出后未预约则淘汰)",
+  work_start_hour: "工作时间起点(小时,生成时段用)",
+  work_end_hour: "工作时间终点(小时,不含)",
   company_name: "公司名(信件署名)",
+  invite_email_subject: "邀请信主题",
+  invite_email_template: "邀请信正文模板",
 };
+
+const PLACEHOLDER_HINT =
+  "可用占位符:{candidate_name} 候选人姓名 · {job_title} 职位 · {booking_url} 预约链接 · {company_name} 公司名";
+const TEMPLATE_KEYS = new Set(["invite_email_subject", "invite_email_template"]);
 
 export default function AdminSettingsPage() {
   const { session, loading } = useSession(true);
@@ -82,12 +91,23 @@ export default function AdminSettingsPage() {
               {s.description}
               {" · "}上次修改 {s.updated_at.slice(0, 16).replace("T", " ")}
             </div>
-            <input
-              style={input}
-              type={s.type === "int" ? "number" : "text"}
-              value={drafts[s.key] ?? ""}
-              onChange={(e) => setDrafts({ ...drafts, [s.key]: e.target.value })}
-            />{" "}
+            {s.multiline ? (
+              <textarea
+                style={{ ...input, width: "100%", height: 200, fontFamily: "inherit", boxSizing: "border-box" }}
+                value={drafts[s.key] ?? ""}
+                onChange={(e) => setDrafts({ ...drafts, [s.key]: e.target.value })}
+              />
+            ) : (
+              <input
+                style={input}
+                type={s.type === "int" ? "number" : "text"}
+                value={drafts[s.key] ?? ""}
+                onChange={(e) => setDrafts({ ...drafts, [s.key]: e.target.value })}
+              />
+            )}
+            {TEMPLATE_KEYS.has(s.key) && (
+              <div style={{ color: "#888", fontSize: 12, margin: "6px 0" }}>{PLACEHOLDER_HINT}</div>
+            )}{" "}
             <button
               style={{ ...btn, opacity: dirty ? 1 : 0.4 }}
               disabled={!dirty || busy === s.key}
