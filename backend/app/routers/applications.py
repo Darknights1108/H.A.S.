@@ -22,6 +22,7 @@ from ..database import get_db
 from ..models import Application, Candidate, Interview, Job, Score, Slot, UserSession
 from ..services.scheduling import draft_email
 from ..services.scoring import score_application
+from ..services.templates import offer_email, rejection_email
 
 router = APIRouter(tags=["applications"])
 
@@ -97,22 +98,8 @@ def submit_application(payload: ApplicationIn, db: Session = Depends(get_db)) ->
     if score.band == "low":
         app_.status = "rejected"
         app_.rejected_reason = "low_band"
-        draft_email(
-            db, app_, "reject",
-            f"Your application — {job.title}",
-            (
-                f"Hi {candidate.name},\n\n"
-                f"Thank you for applying to {job.title}. After careful review, we will "
-                f"not be moving forward with your application at this time.\n\n"
-                + (
-                    "Your profile has been kept in our talent bank and we may reach "
-                    "out when a suitable opportunity opens.\n\n"
-                    if candidate.consent_talent_bank
-                    else ""
-                )
-                + "We wish you all the best.\n"
-            ),
-        )
+        subject, body = rejection_email(db, candidate, job, after_interview=False)
+        draft_email(db, app_, "reject", subject, body)
     else:
         app_.status = "shortlisted"
         app_.shortlisted_at = datetime.datetime.now(datetime.timezone.utc)
@@ -229,38 +216,13 @@ def record_outcome(
     interview.status = payload.result
     if payload.result == "passed":
         app_.status = "passed"
-        email = draft_email(
-            db, app_, "offer",
-            f"Congratulations — {job.title}",
-            (
-                f"Hi {candidate.name},\n\n"
-                f"Congratulations! We are pleased to inform you that you have "
-                f"passed the interview for {job.title}.\n\n"
-                f"Our team will follow up shortly with the offer details and "
-                f"next steps (start date, documents, onboarding).\n\n"
-                f"Welcome aboard!\n"
-            ),
-        )
+        subject, body = offer_email(db, candidate, job)
+        email = draft_email(db, app_, "offer", subject, body)
     else:
         app_.status = "rejected"
         app_.rejected_reason = "interview_failed"
-        email = draft_email(
-            db, app_, "reject",
-            f"Your interview result — {job.title}",
-            (
-                f"Hi {candidate.name},\n\n"
-                f"Thank you for taking the time to interview for {job.title}. "
-                f"After careful consideration, we will not be moving forward "
-                f"with your application.\n\n"
-                + (
-                    "Your profile remains in our talent bank and we may reach "
-                    "out when a suitable opportunity opens.\n\n"
-                    if candidate.consent_talent_bank
-                    else ""
-                )
-                + "We wish you all the best in your career.\n"
-            ),
-        )
+        subject, body = rejection_email(db, candidate, job, after_interview=True)
+        email = draft_email(db, app_, "reject", subject, body)
     db.commit()
     return {
         "application_id": str(app_.id),
@@ -288,15 +250,7 @@ def reject_application(
     job = db.get(Job, app_.job_id)
     app_.status = "rejected"
     app_.rejected_reason = payload.reason
-    draft_email(
-        db, app_, "reject",
-        f"Your application — {job.title}",
-        (
-            f"Hi {candidate.name},\n\n"
-            f"Thank you for your interest in {job.title}. After careful review, we "
-            f"will not be moving forward with your application.\n\n"
-            f"We wish you all the best.\n"
-        ),
-    )
+    subject, body = rejection_email(db, candidate, job, after_interview=False)
+    draft_email(db, app_, "reject", subject, body)
     db.commit()
     return {"application_id": str(app_.id), "status": app_.status}

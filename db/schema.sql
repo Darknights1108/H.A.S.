@@ -43,7 +43,8 @@ INSERT INTO app_setting (key, value, description) VALUES
     ('shortlist_review_days', '7',    'shortlist 多少天内无人审查则自动淘汰'),
     ('slot_duration_minutes', '60',   '面试时段长度(分钟)'),
     ('panel_max_interviewers', '5',   '单个时段最多面试官数(panel 上限)'),
-    ('reschedule_max',        '0',    '确认后允许改期的最大次数(0 = 不限次)')
+    ('reschedule_max',        '0',    '确认后允许改期的最大次数(0 = 不限次)'),
+    ('company_name',          '"HAS"', '候选人信件署名中的公司名')
 ON CONFLICT (key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------

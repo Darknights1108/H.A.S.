@@ -19,6 +19,7 @@ def expire_stale_shortlist() -> int:
     """
     from .models import Application, Candidate, Job
     from .services.scheduling import draft_email, get_setting_int
+    from .services.templates import rejection_email
 
     db = SessionLocal()
     try:
@@ -35,16 +36,8 @@ def expire_stale_shortlist() -> int:
             job = db.get(Job, app_.job_id)
             app_.status = "rejected"
             app_.rejected_reason = "auto_no_review"
-            draft_email(
-                db, app_, "reject",
-                f"Your application — {job.title}",
-                (
-                    f"Hi {candidate.name},\n\n"
-                    f"Thank you for applying to {job.title}. Unfortunately we are "
-                    f"unable to move forward with your application at this time.\n\n"
-                    f"We wish you all the best.\n"
-                ),
-            )
+            subject, body = rejection_email(db, candidate, job, after_interview=False)
+            draft_email(db, app_, "reject", subject, body)
         db.commit()
         if stale:
             logger.info("auto-expired %d shortlisted application(s)", len(stale))

@@ -29,6 +29,8 @@ export default function AdminApplicationsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  // 二次确认:待确认的面试结果 {申请id, 结果} —— 防误点
+  const [pending, setPending] = useState<{ id: string; result: "passed" | "failed" } | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`${API}/api/applications`);
@@ -54,6 +56,7 @@ export default function AdminApplicationsPage() {
 
   async function outcome(id: string, result: "passed" | "failed") {
     setNotice(null);
+    setPending(null);
     const r = await fetch(`${API}/api/applications/${id}/outcome`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -64,8 +67,8 @@ export default function AdminApplicationsPage() {
     else
       setNotice(
         result === "passed"
-          ? "已标记通过 — offer 信草稿已生成,请到 Emails 页审核发送"
-          : "已标记未通过 — 婉拒信草稿已生成,请到 Emails 页审核发送"
+          ? "✅ 已 Accept — offer 信草稿已生成,请到 Emails 页审核发送"
+          : "✅ 已 Reject — 婉拒信草稿已生成,请到 Emails 页审核发送"
       );
     await load();
   }
@@ -131,15 +134,39 @@ export default function AdminApplicationsPage() {
                       </button>
                     </>
                   )}
-                  {r.status === "scheduled" && r.interview && (
+                  {r.status === "scheduled" && r.interview && pending?.id !== r.id && (
                     <>
-                      <button style={{ ...btnSm, background: "#0a6" }} onClick={() => outcome(r.id, "passed")}>
-                        Pass
+                      <button
+                        style={{ ...btnSm, background: "#0a6" }}
+                        onClick={() => setPending({ id: r.id, result: "passed" })}
+                      >
+                        Accept
                       </button>{" "}
-                      <button style={{ ...btnSm, background: "#b33" }} onClick={() => outcome(r.id, "failed")}>
-                        Fail
+                      <button
+                        style={{ ...btnSm, background: "#b33" }}
+                        onClick={() => setPending({ id: r.id, result: "failed" })}
+                      >
+                        Reject
                       </button>
                     </>
+                  )}
+                  {pending?.id === r.id && (
+                    <span style={confirmBox}>
+                      确认将 <b>{r.candidate.name}</b> 标记为{" "}
+                      <b style={{ color: pending.result === "passed" ? "#0a6" : "#b33" }}>
+                        {pending.result === "passed" ? "Accept(发 offer)" : "Reject(发婉拒信)"}
+                      </b>
+                      ?此操作不可撤销。{" "}
+                      <button
+                        style={{ ...btnSm, background: pending.result === "passed" ? "#0a6" : "#b33" }}
+                        onClick={() => outcome(r.id, pending.result)}
+                      >
+                        确认
+                      </button>{" "}
+                      <button style={{ ...btnSm, background: "#888" }} onClick={() => setPending(null)}>
+                        取消
+                      </button>
+                    </span>
                   )}
                 </td>
               </tr>
@@ -174,4 +201,8 @@ const bandColor: Record<string, React.CSSProperties> = {
 const btnSm: React.CSSProperties = {
   padding: "4px 10px", border: "none", borderRadius: 4,
   background: "#334", color: "#fff", cursor: "pointer", fontSize: 12,
+};
+const confirmBox: React.CSSProperties = {
+  display: "inline-block", background: "#fff8e1", border: "1px solid #f0d264",
+  borderRadius: 6, padding: "6px 10px", fontSize: 12,
 };
