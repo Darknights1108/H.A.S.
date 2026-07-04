@@ -114,25 +114,29 @@ export default function AdminJobsPage() {
     return { knockout, bonus, high_min_bonus: parseFloat(draft.high_min_bonus || "15") };
   }
 
-  async function createJob() {
+  async function saveJob() {
     setBusy(true);
     setNotice(null);
     try {
-      const r = await fetch(`${API}/api/jobs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: draft.title,
-          description: draft.description || null,
-          requirements: buildRequirements(),
-        }),
+      const body = JSON.stringify({
+        title: draft.title,
+        description: draft.description || null,
+        requirements: buildRequirements(),
       });
+      const r = editingId
+        ? await fetch(`${API}/api/jobs/${editingId}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" }, body,
+          })
+        : await fetch(`${API}/api/jobs`, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body,
+          });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail ?? `HTTP ${r.status}`);
-      setNotice(`职位已创建:${data.title}`);
+      setNotice(editingId ? `已保存修改:${data.title}(对之后的新申请生效)` : `职位已创建:${data.title}`);
       setDraft(emptyDraft);
       setJdText("");
       setShowForm(false);
+      setEditingId(null);
       setUnmapped([]);
       await load();
     } catch (e) {
@@ -140,6 +144,16 @@ export default function AdminJobsPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function deleteJob(id: string) {
+    setDeleteConfirm(null);
+    setNotice(null);
+    const r = await fetch(`${API}/api/jobs/${id}`, { method: "DELETE" });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
+    else setNotice("职位已删除");
+    await load();
   }
 
   async function toggleOpen(job: JobRow) {
@@ -187,7 +201,7 @@ export default function AdminJobsPage() {
 
       {showForm && (
         <section style={card}>
-          <h2 style={{ marginTop: 0 }}>Screening rules(可修改)</h2>
+          <h2 style={{ marginTop: 0 }}>{editingId ? "Edit screening rules" : "Screening rules(可修改)"}</h2>
           <label style={lbl}>Title *</label>
           <input style={input} value={draft.title} onChange={(e) => set("title", e.target.value)} />
           <label style={lbl}>Description</label>
@@ -223,9 +237,14 @@ export default function AdminJobsPage() {
             onChange={(e) => set("high_min_bonus", e.target.value)} />
 
           <p>
-            <button style={primary} disabled={busy || !draft.title} onClick={createJob}>
-              Create job
-            </button>
+            <button style={primary} disabled={busy || !draft.title} onClick={saveJob}>
+              {editingId ? "Save changes" : "Create job"}
+            </button>{" "}
+            {editingId && (
+              <button style={secondary} disabled={busy} onClick={cancelEdit}>
+                Cancel edit
+              </button>
+            )}
           </p>
         </section>
       )}
@@ -233,21 +252,63 @@ export default function AdminJobsPage() {
       <section style={card}>
         <h2 style={{ marginTop: 0 }}>Existing jobs</h2>
         {jobs.map((j) => (
-          <div key={j.id} style={{ borderBottom: "1px solid #eee", padding: "8px 0" }}>
+          <div key={j.id} style={{ borderBottom: "1px solid #eee", padding: "10px 0" }}>
             <b>{j.title}</b>{" "}
             <span style={{ ...badge, background: j.is_open ? "#d8f5e8" : "#eee", color: j.is_open ? "#0a6" : "#777" }}>
               {j.is_open ? "open" : "closed"}
             </span>{" "}
+            <span style={{ color: "#888", fontSize: 12 }}>{j.application_count} application(s)</span>{" "}
+            <button style={btnSm} onClick={() => setExpandedJob(expandedJob === j.id ? null : j.id)}>
+              {expandedJob === j.id ? "收起条件" : "展开条件"}
+            </button>{" "}
+            <button style={btnSm} onClick={() => startEdit(j)}>Edit</button>{" "}
             <button style={btnSm} onClick={() => toggleOpen(j)}>
               {j.is_open ? "Close" : "Reopen"}
-            </button>
-            <pre style={{ fontSize: 12, color: "#666", whiteSpace: "pre-wrap", margin: "6px 0 0" }}>
-              {JSON.stringify(j.requirements, null, 1)}
-            </pre>
+            </button>{" "}
+            {deleteConfirm === j.id ? (
+              <span style={{ background: "#fff8e1", border: "1px solid #f0d264", borderRadius: 6, padding: "3px 8px", fontSize: 12 }}>
+                确认删除「{j.title}」?{" "}
+                <button style={{ ...btnSm, background: "#b33" }} onClick={() => deleteJob(j.id)}>删除</button>{" "}
+                <button style={{ ...btnSm, background: "#888" }} onClick={() => setDeleteConfirm(null)}>取消</button>
+              </span>
+            ) : (
+              <button style={{ ...btnSm, background: "#b33" }} onClick={() => setDeleteConfirm(j.id)}>
+                Delete
+              </button>
+            )}
+            {expandedJob === j.id && <RulesView req={j.requirements} />}
           </div>
         ))}
       </section>
     </main>
+  );
+}
+
+function RulesView({ req }: { req: Requirements }) {
+  const ko = req.knockout ?? {};
+  const bo = req.bonus ?? {};
+  const li: React.CSSProperties = { margin: "2px 0" };
+  return (
+    <div style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 6, padding: "8px 14px", marginTop: 8, fontSize: 13 }}>
+      <b>硬门槛(任一不满足 → Low)</b>
+      <ul style={{ margin: "4px 0 10px" }}>
+        {ko.min_cgpa != null && <li style={li}>CGPA ≥ {ko.min_cgpa}</li>}
+        {(ko.fields?.length ?? 0) > 0 && <li style={li}>专业属于:{ko.fields!.join(" / ")}</li>}
+        {ko.require_fulltime && <li style={li}>必须是全日制学生</li>}
+        {(ko.langs_any?.length ?? 0) > 0 && <li style={li}>会编程语言(任一):{ko.langs_any!.join(" / ")}</li>}
+        {ko.require_sql && <li style={li}>必须会 SQL</li>}
+        {ko.min_cgpa == null && !(ko.fields?.length) && !ko.require_fulltime && !(ko.langs_any?.length) && !ko.require_sql && (
+          <li style={li}>(无硬门槛)</li>
+        )}
+      </ul>
+      <b>加分项(总分 ≥ {req.high_min_bonus ?? 15} → High,否则 Medium)</b>
+      <ul style={{ margin: "4px 0 0" }}>
+        {bo.ai_study != null && <li style={li}>AI 学习/项目 +{bo.ai_study}</li>}
+        {bo.eca != null && <li style={li}>课外活动 +{bo.eca}</li>}
+        {bo.extra_lang != null && <li style={li}>多种编程语言 +{bo.extra_lang}</li>}
+        {bo.ai_study == null && bo.eca == null && bo.extra_lang == null && <li style={li}>(无加分项)</li>}
+      </ul>
+    </div>
   );
 }
 

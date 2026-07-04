@@ -17,9 +17,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func
+
 from ..auth import require_admin
 from ..database import get_db
-from ..models import Job, UserSession
+from ..models import Application, Job, UserSession
 from ..services import llm
 
 logger = logging.getLogger(__name__)
@@ -166,10 +168,35 @@ def update_job(job_id: uuid.UUID, payload: JobPatch, db: Session = Depends(get_d
     return {"id": str(job.id), "title": job.title, "is_open": job.is_open}
 
 
+@router.delete("/{job_id}")
+def delete_job(job_id: uuid.UUID, db: Session = Depends(get_db),
+               _admin: UserSession = Depends(require_admin)) -> dict:
+    """删除职位。已有申请的职位不可删(数据完整性),请改为关闭。"""
+    job = db.get(Job, job_id)
+    if job is None:
+        raise HTTPException(404, "job not found")
+    n_apps = db.scalar(
+        select(func.count()).select_from(Application).where(Application.job_id == job_id)
+    ) or 0
+    if n_apps > 0:
+        raise HTTPException(
+            409,
+            f"cannot delete: {n_apps} application(s) reference this job — close it instead",
+        )
+    db.delete(job)
+    db.commit()
+    return {"deleted": str(job_id)}
+
+
 @router.get("/all")
 def list_all_jobs(db: Session = Depends(get_db),
                   _admin: UserSession = Depends(require_admin)) -> list[dict]:
     jobs = db.scalars(select(Job).order_by(Job.created_at.desc())).all()
+    app_counts = dict(
+        db.execute(
+            select(Application.job_id, func.count()).group_by(Application.job_id)
+        ).all()
+    )
     return [
         {
             "id": str(j.id),
@@ -177,6 +204,7 @@ def list_all_jobs(db: Session = Depends(get_db),
             "description": j.description,
             "requirements": j.requirements,
             "is_open": j.is_open,
+            "application_count": app_counts.get(j.id, 0),
             "created_at": j.created_at.isoformat(),
         }
         for j in jobs
