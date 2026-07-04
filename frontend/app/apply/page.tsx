@@ -28,6 +28,7 @@ export default function ApplyPage() {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resume, setResume] = useState<File | null>(null);
 
   useEffect(() => {
     fetch(`${API}/api/jobs`)
@@ -47,18 +48,29 @@ export default function ApplyPage() {
     setBusy(true);
     setError(null);
     try {
-      const r = await fetch(`${API}/api/applications`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          cgpa: parseFloat(form.cgpa),
-          phone: form.phone || null,
-          eca: form.eca || null,
-        }),
-      });
+      const fd = new FormData();
+      fd.append("job_id", form.job_id);
+      fd.append("name", form.name);
+      fd.append("email", form.email);
+      if (form.phone) fd.append("phone", form.phone);
+      fd.append("cgpa", form.cgpa);
+      fd.append("degree_field", form.degree_field);
+      fd.append("is_fulltime", String(form.is_fulltime));
+      fd.append("prog_langs", JSON.stringify(form.prog_langs));
+      fd.append("has_sql", String(form.has_sql));
+      fd.append("has_ai_study", String(form.has_ai_study));
+      if (form.eca) fd.append("eca", form.eca);
+      fd.append("consent_talent_bank", String(form.consent_talent_bank));
+      if (resume) fd.append("resume", resume);
+
+      const r = await fetch(`${API}/api/applications`, { method: "POST", body: fd });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.detail ?? `HTTP ${r.status}`);
+      if (!r.ok) {
+        const detail = Array.isArray(data.detail)
+          ? data.detail.map((d: { msg: string }) => d.msg).join("; ")
+          : data.detail;
+        throw new Error(detail ?? `HTTP ${r.status}`);
+      }
       setResult(data.message);
     } catch (e) {
       setError(String(e));
@@ -139,6 +151,14 @@ export default function ApplyPage() {
         <input type="checkbox" checked={form.has_ai_study}
           onChange={(e) => set("has_ai_study", e.target.checked)} /> I have studied AI (courses/projects)
       </label>
+
+      <label style={lbl}>Resume(PDF / DOCX / TXT,≤5MB)</label>
+      <input
+        style={{ ...input, padding: "6px" }}
+        type="file"
+        accept=".pdf,.docx,.txt"
+        onChange={(e) => setResume(e.target.files?.[0] ?? null)}
+      />
 
       <label style={lbl}>Extra-curricular activities</label>
       <textarea style={{ ...input, height: 80 }} value={form.eca}

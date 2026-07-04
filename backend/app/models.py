@@ -101,6 +101,10 @@ class Application(Base):
     )
     eca: Mapped[str | None] = mapped_column(Text)
     resume_file_url: Mapped[str | None] = mapped_column(Text)
+    resume_parsed: Mapped[dict | None] = mapped_column(JSONB)
+    resume_parse_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'none'")
+    )
     form_data: Mapped[dict] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )

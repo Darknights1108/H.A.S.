@@ -22,6 +22,24 @@ type Row = {
   booking_url: string;
   submitted_at: string;
   interview: { date: string; start: string; end: string; meeting_link: string | null } | null;
+  resume: {
+    uploaded: boolean;
+    status: "none" | "pending" | "done" | "failed";
+    parsed: ResumeParsed | null;
+  };
+};
+
+type ResumeParsed = {
+  summary?: string;
+  education?: { institution?: string; degree?: string; field?: string; cgpa?: number | null }[];
+  experience_projects?: { title?: string; organization?: string; description?: string }[];
+  programming_languages?: string[];
+  other_skills?: string[];
+  ai_evidence?: string[];
+  extracurricular?: string[];
+  consistency_notes?: string[];
+  model?: string;
+  error?: string;
 };
 
 export default function AdminApplicationsPage() {
@@ -85,7 +103,7 @@ export default function AdminApplicationsPage() {
           <tr>
             <th style={th}>Candidate</th><th style={th}>Job</th><th style={th}>CGPA</th>
             <th style={th}>Band</th><th style={th}>Score</th><th style={th}>Status</th>
-            <th style={th}>Interview</th><th style={th}>Actions</th>
+            <th style={th}>Interview</th><th style={th}>Resume</th><th style={th}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -118,6 +136,15 @@ export default function AdminApplicationsPage() {
                     </>
                   ) : (
                     "—"
+                  )}
+                </td>
+                <td style={td}>
+                  {!r.resume.uploaded ? (
+                    "—"
+                  ) : (
+                    <span style={{ ...badge, ...resumeColor[r.resume.status] }}>
+                      {r.resume.status === "done" ? "parsed ✓" : r.resume.status}
+                    </span>
                   )}
                 </td>
                 <td style={td}>
@@ -172,10 +199,47 @@ export default function AdminApplicationsPage() {
               </tr>
               {expanded === r.id && (
                 <tr key={r.id + "-detail"}>
-                  <td style={{ ...td, background: "#fafafa" }} colSpan={8}>
-                    <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontSize: 13 }}>
+                  <td style={{ ...td, background: "#fafafa" }} colSpan={9}>
+                    <b style={{ fontSize: 13 }}>Score reasoning</b>
+                    <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 12px", fontSize: 13 }}>
                       {r.reasoning ?? "no score"}
                     </pre>
+                    {r.resume.uploaded && r.resume.parsed && r.resume.status === "done" && (
+                      <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
+                        <b style={{ fontSize: 13 }}>
+                          Resume analysis{" "}
+                          <a href={`${API}/api/applications/${r.id}/resume`} style={{ fontSize: 12 }}>
+                            [download original]
+                          </a>
+                        </b>
+                        <p style={{ fontSize: 13, margin: "6px 0" }}>{r.resume.parsed.summary}</p>
+                        {(r.resume.parsed.programming_languages?.length ?? 0) > 0 && (
+                          <p style={{ fontSize: 13, margin: "4px 0" }}>
+                            <b>Languages:</b> {r.resume.parsed.programming_languages!.join(", ")}
+                          </p>
+                        )}
+                        {(r.resume.parsed.ai_evidence?.length ?? 0) > 0 && (
+                          <p style={{ fontSize: 13, margin: "4px 0" }}>
+                            <b>AI evidence:</b> {r.resume.parsed.ai_evidence!.join(" · ")}
+                          </p>
+                        )}
+                        {(r.resume.parsed.consistency_notes?.length ?? 0) > 0 && (
+                          <div style={{ background: "#fff8e1", border: "1px solid #f0d264",
+                                        borderRadius: 6, padding: "6px 10px", marginTop: 6 }}>
+                            <b style={{ fontSize: 13 }}>Form cross-check</b>
+                            <ul style={{ margin: "4px 0", fontSize: 13 }}>
+                              {r.resume.parsed.consistency_notes!.map((n, i) => <li key={i}>{n}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {r.resume.status === "failed" && (
+                      <p style={{ fontSize: 13, color: "#b33" }}>
+                        Resume parse failed: {r.resume.parsed?.error ?? "unknown"}{" "}
+                        <a href={`${API}/api/applications/${r.id}/resume`}>[download original]</a>
+                      </p>
+                    )}
                     <p style={{ fontSize: 12, color: "#888", marginBottom: 0 }}>
                       Booking link: {r.booking_url}
                     </p>
@@ -197,6 +261,12 @@ const bandColor: Record<string, React.CSSProperties> = {
   high: { background: "#d8f5e8", color: "#0a6" },
   medium: { background: "#fef3c7", color: "#92600a" },
   low: { background: "#fee2e2", color: "#b33" },
+};
+const resumeColor: Record<string, React.CSSProperties> = {
+  none: { background: "#eee", color: "#777" },
+  pending: { background: "#fef3c7", color: "#92600a" },
+  done: { background: "#d8f5e8", color: "#0a6" },
+  failed: { background: "#fee2e2", color: "#b33" },
 };
 const btnSm: React.CSSProperties = {
   padding: "4px 10px", border: "none", borderRadius: 4,

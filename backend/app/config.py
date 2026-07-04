@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     session_ttl_days: int = 7            # 会话有效期
     cookie_secure: bool = False          # 生产 HTTPS 环境置 true
     debug_expose_magic_link: bool = False  # 仅开发:request-link 响应直接带链接
+    # 对象存储(简历文件)
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: str = "has"
+    minio_secret_key: str = "hasminio123"
+    minio_bucket: str = "resumes"
+    minio_secure: bool = False
 
     @property
     def smtp_configured(self) -> bool:

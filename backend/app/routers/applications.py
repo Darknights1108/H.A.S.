@@ -9,9 +9,12 @@
 """
 
 import datetime
+import io
+import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,8 +23,10 @@ from ..auth import require_admin
 from ..config import settings
 from ..database import get_db
 from ..models import Application, Candidate, Interview, Job, Score, Slot, UserSession
+from ..services.resume import ALLOWED_EXTS, MAX_SIZE, parse_resume_async
 from ..services.scheduling import draft_email
 from ..services.scoring import score_application
+from ..services.storage import CONTENT_TYPES, get_resume, put_resume
 from ..services.templates import invite_email, offer_email, rejection_email
 
 router = APIRouter(tags=["applications"])
@@ -33,9 +38,11 @@ def list_jobs(db: Session = Depends(get_db)) -> list[dict]:
     return [{"id": str(j.id), "title": j.title, "description": j.description} for j in jobs]
 
 
-# ---------- public submission ----------
+# ---------- public submission(multipart:表单字段 + 可选简历文件)----------
 
 class ApplicationIn(BaseModel):
+    """multipart 字段先解析成本模型再走原有逻辑。"""
+
     job_id: uuid.UUID
     name: str = Field(min_length=1)
     email: EmailStr
@@ -51,7 +58,47 @@ class ApplicationIn(BaseModel):
 
 
 @router.post("/applications", status_code=201)
-def submit_application(payload: ApplicationIn, db: Session = Depends(get_db)) -> dict:
+def submit_application(
+    job_id: uuid.UUID = Form(...),
+    name: str = Form(...),
+    email: EmailStr = Form(...),
+    phone: str | None = Form(None),
+    cgpa: float = Form(..., ge=0, le=4),
+    degree_field: str = Form(...),
+    is_fulltime: bool = Form(...),
+    prog_langs: str = Form("[]"),          # JSON array string
+    has_sql: bool = Form(False),
+    has_ai_study: bool = Form(False),
+    eca: str | None = Form(None),
+    consent_talent_bank: bool = Form(False),
+    resume: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
+) -> dict:
+    try:
+        langs = json.loads(prog_langs)
+        assert isinstance(langs, list)
+        langs = [str(x) for x in langs]
+    except (ValueError, AssertionError):
+        raise HTTPException(422, "prog_langs must be a JSON array of strings")
+
+    payload = ApplicationIn(
+        job_id=job_id, name=name, email=email, phone=phone or None, cgpa=cgpa,
+        degree_field=degree_field, is_fulltime=is_fulltime, prog_langs=langs,
+        has_sql=has_sql, has_ai_study=has_ai_study, eca=eca or None,
+        consent_talent_bank=consent_talent_bank,
+    )
+
+    # 简历文件先校验(格式/大小),申请建好后再入库存储
+    resume_data: bytes | None = None
+    resume_ext = ""
+    if resume is not None and resume.filename:
+        resume_ext = "." + resume.filename.rsplit(".", 1)[-1].lower() if "." in resume.filename else ""
+        if resume_ext not in ALLOWED_EXTS:
+            raise HTTPException(422, f"resume must be one of {sorted(ALLOWED_EXTS)}")
+        resume_data = resume.file.read()
+        if len(resume_data) > MAX_SIZE:
+            raise HTTPException(422, "resume too large (max 5MB)")
+
     job = db.get(Job, payload.job_id)
     if job is None or not job.is_open:
         raise HTTPException(404, "job not found or closed")
@@ -93,7 +140,17 @@ def submit_application(payload: ApplicationIn, db: Session = Depends(get_db)) ->
     db.add(app_)
     db.flush()
 
-    # 提交即打分分流
+    # 简历入对象存储(存储故障不吞:候选人应重试,而不是简历悄悄丢失)
+    if resume_data is not None:
+        key = f"{app_.id}{resume_ext}"
+        try:
+            put_resume(key, resume_data, resume_ext)
+        except Exception as e:
+            raise HTTPException(503, f"resume storage unavailable, please retry: {e}") from e
+        app_.resume_file_url = key
+        app_.resume_parse_status = "pending"
+
+    # 提交即打分分流(表单为主数据源,与简历解析解耦)
     score = score_application(db, app_)
     if score.band == "low":
         app_.status = "rejected"
@@ -105,6 +162,8 @@ def submit_application(payload: ApplicationIn, db: Session = Depends(get_db)) ->
         app_.shortlisted_at = datetime.datetime.now(datetime.timezone.utc)
 
     db.commit()
+    if resume_data is not None:
+        parse_resume_async(app_.id)  # 后台 LLM 解析,不阻塞提交
     # 对候选人只返回"已收到",不暴露打分结果
     return {"application_id": str(app_.id), "message": "Application received. We will be in touch."}
 
@@ -146,6 +205,11 @@ def list_applications(db: Session = Depends(get_db),
             "reasoning": s.reasoning if s else None,
             "booking_url": f"{settings.frontend_base_url}/booking/{a.booking_token}",
             "submitted_at": a.submitted_at.isoformat(),
+            "resume": {
+                "uploaded": bool(a.resume_file_url),
+                "status": a.resume_parse_status,
+                "parsed": a.resume_parsed,
+            },
             "interview": (
                 {
                     "date": itv_map[a.id][1].slot_date.isoformat(),
@@ -176,6 +240,24 @@ def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)
     email = draft_email(db, app_, "invite", subject, body)
     db.commit()
     return {"application_id": str(app_.id), "invite_email_id": str(email.id), "booking_url": booking_url}
+
+
+@router.get("/applications/{application_id}/resume")
+def download_resume(application_id: uuid.UUID, db: Session = Depends(get_db),
+                    _admin: UserSession = Depends(require_admin)) -> StreamingResponse:
+    app_ = db.get(Application, application_id)
+    if app_ is None or not app_.resume_file_url:
+        raise HTTPException(404, "no resume for this application")
+    try:
+        data = get_resume(app_.resume_file_url)
+    except Exception as e:
+        raise HTTPException(502, f"storage error: {e}") from e
+    ext = "." + app_.resume_file_url.rsplit(".", 1)[-1].lower()
+    return StreamingResponse(
+        io.BytesIO(data),
+        media_type=CONTENT_TYPES.get(ext, "application/octet-stream"),
+        headers={"Content-Disposition": f'attachment; filename="resume{ext}"'},
+    )
 
 
 class OutcomeIn(BaseModel):

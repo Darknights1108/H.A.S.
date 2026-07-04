@@ -60,7 +60,10 @@ npm run dev
 - [x] 职位管理 `/admin/jobs`:贴 JD → AI 解析成筛选规则(chat box)→ 预览修改 → 创建
   - 每个职位独立规则(`job.requirements`),打分动态执行;开/关职位
   - AI 解析需 `ANTHROPIC_API_KEY`,无 key 时降级为手动填规则表单
-- [ ] 简历文件上传 + LLM 解析(依赖对象存储,加分项佐证用)
+- [x] 简历上传 + LLM 解析:MinIO 对象存储(PDF/DOCX/TXT ≤5MB)
+  - 后台线程解析(不阻塞提交):文本提取 → LLM 结构化抽取(教育/经历/技能/AI 证据)
+  - ★ 与表单声明交叉核对(consistency notes:CONFIRMED / MISMATCH / NOT FOUND)
+  - 审查页展开可见摘要+核对结果,可下载原文件;打分仍以表单为主数据源
 - [x] 邮件发送:Outbox `/admin/emails`(草稿预览 → 人工 Send);Gmail SMTP(App Password,`.env` 配 `SMTP_*`)
   - 预约确认/改期信自动发送(纯事实性);邀请/婉拒/offer 走 Outbox 人工审核
   - SMTP 未配置时草稿保留,页面有提示
