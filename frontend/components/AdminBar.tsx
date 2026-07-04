@@ -9,6 +9,7 @@ const LINKS: [string, string, boolean][] = [
   ["/admin/slots", "Slots", false],
   ["/admin/emails", "Emails", true],
   ["/admin/allowlist", "Allowlist", true],
+  ["/admin/settings", "Settings", true],
 ];
 
 export default function AdminBar({ session }: { session: Session }) {

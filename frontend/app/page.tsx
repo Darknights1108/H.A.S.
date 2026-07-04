@@ -1,71 +1,23 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "";
-
-type Setting = { key: string; value: unknown; description: string | null };
-
 export default function Home() {
-  const [settings, setSettings] = useState<Setting[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`${API}/api/settings`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: Setting[]) => setSettings(data))
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
-  }, []);
-
   return (
-    <main style={{ maxWidth: 720 }}>
+    <main style={{ maxWidth: 560, margin: "12vh auto 0", textAlign: "center" }}>
       <h1>HAS — Hiring Automation System</h1>
       <p style={{ color: "#666" }}>
-        最小闭环:前端从后端 <code>{API}/api/settings</code> 拉取配置。
+        Apply for open positions, or sign in to manage recruitment.
       </p>
-
-      {loading && <p>Loading…</p>}
-      {error && (
-        <p style={{ color: "#b00" }}>
-          连接后端失败:{error}（确认后端已在 {API} 运行）
-        </p>
-      )}
-
-      {!loading && !error && (
-        <table style={{ borderCollapse: "collapse", width: "100%" }}>
-          <thead>
-            <tr>
-              <th style={th}>Key</th>
-              <th style={th}>Value</th>
-              <th style={th}>Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {settings.map((s) => (
-              <tr key={s.key}>
-                <td style={td}><code>{s.key}</code></td>
-                <td style={td}>{JSON.stringify(s.value)}</td>
-                <td style={td}>{s.description}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <p style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 32 }}>
+        <a href="/apply" style={primary}>Apply for a position</a>
+        <a href="/login" style={secondary}>Staff sign in</a>
+      </p>
     </main>
   );
 }
 
-const th: React.CSSProperties = {
-  textAlign: "left",
-  borderBottom: "2px solid #ddd",
-  padding: "8px",
+const primary: React.CSSProperties = {
+  padding: "12px 24px", borderRadius: 8, background: "#334",
+  color: "#fff", textDecoration: "none",
 };
-const td: React.CSSProperties = {
-  borderBottom: "1px solid #eee",
-  padding: "8px",
+const secondary: React.CSSProperties = {
+  padding: "12px 24px", borderRadius: 8, border: "1px solid #ccc",
+  color: "#334", textDecoration: "none",
 };

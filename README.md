@@ -71,6 +71,6 @@ npm run dev
   - 登录页 `/login`;白名单管理 `/admin/allowlist`(角色/启停/审计)
   - 面试官登入后只能以自己身份认领时段;admin 才能进审查/职位/邮件页
   - 首个 admin 由 `ADMIN_EMAIL` 环境变量启动时写入
-- [ ] Admin 设置页
+- [x] Admin 设置页 `/admin/settings`:审查期限/时段长度/panel 上限/改期上限/公司署名,带取值校验,改动即时生效
 - [ ] 真实会议链接(目前为 Jitsi 占位)
 ```
