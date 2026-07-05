@@ -9,6 +9,7 @@ const LINKS: [string, string, boolean][] = [
   ["/admin/slots", "Slots", false],
   ["/admin/emails", "Emails", true],
   ["/admin/allowlist", "Allowlist", true],
+  ["/admin/analytics", "Analytics", true],
   ["/admin/settings", "Settings", true],
 ];
 

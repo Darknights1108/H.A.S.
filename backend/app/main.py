@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .api import router
 from .config import settings
+from .routers.analytics import router as analytics_router
 from .routers.applications import router as applications_router
 from .routers.auth import router as auth_router
 from .routers.booking import router as booking_router
@@ -61,6 +62,7 @@ app.include_router(interviewer_router, prefix="/api")
 app.include_router(applications_router, prefix="/api")
 app.include_router(jobs_router, prefix="/api")
 app.include_router(emails_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
 app.include_router(booking_router, prefix="/api")
 app.include_router(dev_router, prefix="/api")  # dev only — remove before production
 

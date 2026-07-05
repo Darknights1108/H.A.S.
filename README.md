@@ -70,6 +70,7 @@ npm run dev
 - [x] 面试结果处理:admin 在审查页对已排面试标记 Pass / Fail
   - Pass → application=passed + offer 信草稿;Fail → rejected(interview_failed)+ 婉拒信草稿(留 talent bank)
   - 草稿进 Outbox 人工审核发送;pipeline 全链路闭环
+- [x] Analytics `/admin/analytics`:总览卡片、招聘漏斗、band 分布、淘汰原因、各职位统计、近14天趋势、时段利用率、面试官负载
 - [x] 认证:Magic Link(免密码)+ 邮箱白名单 + Session Cookie(详见 `docs/auth-magic-link.md`)
   - 登录页 `/login`;白名单管理 `/admin/allowlist`(角色/启停/审计)
   - 面试官登入后只能以自己身份认领时段;admin 才能进审查/职位/邮件页
