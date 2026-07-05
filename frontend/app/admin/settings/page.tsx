@@ -75,11 +75,11 @@ export default function AdminSettingsPage() {
     <main style={{ maxWidth: 720 }}>
       <AdminBar session={session} />
       <h1>Settings</h1>
-      <p style={{ color: "#666" }}>
+      <p style={{ color: "#6b7280" }}>
         改动即时生效(定时任务、panel 上限、改期限制、信件署名都动态读取这些值)。
       </p>
       {notice && (
-        <p style={{ color: notice.startsWith("✅") ? "#0a6" : "#b00" }}>{notice}</p>
+        <p style={{ color: notice.startsWith("✅") ? "#059669" : "#dc2626" }}>{notice}</p>
       )}
 
       {rows.map((s) => {
@@ -87,7 +87,7 @@ export default function AdminSettingsPage() {
         return (
           <section key={s.key} style={card}>
             <label style={{ fontWeight: 600 }}>{LABELS[s.key] ?? s.key}</label>
-            <div style={{ color: "#888", fontSize: 12, margin: "2px 0 8px" }}>
+            <div style={{ color: "#6b7280", fontSize: 12, margin: "2px 0 8px" }}>
               {s.description}
               {" · "}上次修改 {s.updated_at.slice(0, 16).replace("T", " ")}
             </div>
@@ -106,7 +106,7 @@ export default function AdminSettingsPage() {
               />
             )}
             {TEMPLATE_KEYS.has(s.key) && (
-              <div style={{ color: "#888", fontSize: 12, margin: "6px 0" }}>{PLACEHOLDER_HINT}</div>
+              <div style={{ color: "#6b7280", fontSize: 12, margin: "6px 0" }}>{PLACEHOLDER_HINT}</div>
             )}{" "}
             <button
               style={{ ...btn, opacity: dirty ? 1 : 0.4 }}
@@ -123,12 +123,12 @@ export default function AdminSettingsPage() {
 }
 
 const card: React.CSSProperties = {
-  border: "1px solid #ddd", borderRadius: 8, padding: "12px 16px", margin: "12px 0",
+  background: "#fff", boxShadow: "0 1px 3px rgba(16,24,40,0.06)", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", margin: "12px 0",
 };
 const input: React.CSSProperties = {
-  padding: "8px 10px", border: "1px solid #ccc", borderRadius: 6, width: 260,
+  padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: 8, width: 260,
 };
 const btn: React.CSSProperties = {
-  padding: "8px 18px", border: "none", borderRadius: 6,
-  background: "#334", color: "#fff", cursor: "pointer",
+  padding: "8px 18px", border: "none", borderRadius: 8,
+  background: "#4338ca", color: "#fff", cursor: "pointer",
 };

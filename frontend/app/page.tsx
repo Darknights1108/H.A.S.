@@ -2,7 +2,7 @@ export default function Home() {
   return (
     <main style={{ maxWidth: 560, margin: "12vh auto 0", textAlign: "center" }}>
       <h1>HAS — Hiring Automation System</h1>
-      <p style={{ color: "#666" }}>
+      <p style={{ color: "#6b7280" }}>
         Apply for open positions, or sign in to manage recruitment.
       </p>
       <p style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 32 }}>
@@ -14,10 +14,10 @@ export default function Home() {
 }
 
 const primary: React.CSSProperties = {
-  padding: "12px 24px", borderRadius: 8, background: "#334",
+  padding: "12px 24px", borderRadius: 12, background: "#4338ca",
   color: "#fff", textDecoration: "none",
 };
 const secondary: React.CSSProperties = {
-  padding: "12px 24px", borderRadius: 8, border: "1px solid #ccc",
-  color: "#334", textDecoration: "none",
+  padding: "12px 24px", borderRadius: 12, border: "1px solid #d1d5db",
+  color: "#4338ca", textDecoration: "none",
 };

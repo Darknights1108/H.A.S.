@@ -91,7 +91,7 @@ export default function ApplyPage() {
   return (
     <main style={wrap}>
       <h1>Internship application</h1>
-      {error && <p style={{ color: "#b00" }}>{error}</p>}
+      {error && <p style={{ color: "#dc2626" }}>{error}</p>}
 
       <label style={lbl}>Position</label>
       <select style={input} value={form.job_id} onChange={(e) => set("job_id", e.target.value)}>
@@ -187,10 +187,10 @@ const wrap: React.CSSProperties = { maxWidth: 560, margin: "0 auto" };
 const lbl: React.CSSProperties = { display: "block", marginTop: 14, fontWeight: 600 };
 const input: React.CSSProperties = {
   display: "block", width: "100%", padding: "8px 10px", marginTop: 4,
-  border: "1px solid #ccc", borderRadius: 6, boxSizing: "border-box",
+  border: "1px solid #d1d5db", borderRadius: 8, boxSizing: "border-box",
 };
 const chk: React.CSSProperties = { display: "block", marginTop: 10 };
 const primary: React.CSSProperties = {
-  padding: "10px 22px", border: "none", borderRadius: 6,
-  background: "#334", color: "#fff", cursor: "pointer",
+  padding: "10px 22px", border: "none", borderRadius: 8,
+  background: "#4338ca", color: "#fff", cursor: "pointer",
 };

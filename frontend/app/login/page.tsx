@@ -36,7 +36,7 @@ export default function LoginPage() {
             be sent. The link expires in 15 minutes.
           </p>
           {debugLink && (
-            <p style={{ fontSize: 12, color: "#888", wordBreak: "break-all" }}>
+            <p style={{ fontSize: 12, color: "#6b7280", wordBreak: "break-all" }}>
               [dev only] <a href={debugLink}>{debugLink}</a>
             </p>
           )}
@@ -60,7 +60,7 @@ export default function LoginPage() {
               {busy ? "Sending…" : "Send me a login link"}
             </button>
           </p>
-          <p style={{ color: "#888", fontSize: 13 }}>
+          <p style={{ color: "#6b7280", fontSize: 13 }}>
             No password needed — we email you a one-time sign-in link.
           </p>
         </div>
@@ -71,17 +71,17 @@ export default function LoginPage() {
 
 const wrap: React.CSSProperties = { maxWidth: 420, margin: "8vh auto 0" };
 const card: React.CSSProperties = {
-  border: "1px solid #ddd", borderRadius: 8, padding: "20px 24px",
+  background: "#fff", boxShadow: "0 1px 3px rgba(16,24,40,0.06)", border: "1px solid #e5e7eb", borderRadius: 12, padding: "20px 24px",
 };
 const input: React.CSSProperties = {
   display: "block", width: "100%", padding: "10px 12px", marginTop: 6,
-  border: "1px solid #ccc", borderRadius: 6, boxSizing: "border-box",
+  border: "1px solid #d1d5db", borderRadius: 8, boxSizing: "border-box",
 };
 const primary: React.CSSProperties = {
-  padding: "10px 20px", border: "none", borderRadius: 6,
-  background: "#334", color: "#fff", cursor: "pointer",
+  padding: "10px 20px", border: "none", borderRadius: 8,
+  background: "#4338ca", color: "#fff", cursor: "pointer",
 };
 const secondary: React.CSSProperties = {
-  padding: "8px 16px", border: "1px solid #ccc", borderRadius: 6,
-  background: "#f5f5f5", cursor: "pointer",
+  padding: "8px 16px", border: "1px solid #d1d5db", borderRadius: 8,
+  background: "#f3f4f6", cursor: "pointer",
 };

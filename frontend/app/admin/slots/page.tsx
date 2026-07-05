@@ -121,7 +121,7 @@ export default function AdminSlotsPage() {
         {actingId && (
           <p style={{ marginBottom: 0 }}>
             <button
-              style={{ ...btn, background: "#0a6" }}
+              style={{ ...btn, background: "#059669" }}
               onClick={() =>
                 api("POST", "/slots/claim-bulk", {
                   ...idBody, start_date: startDate, end_date: endDate,
@@ -131,7 +131,7 @@ export default function AdminSlotsPage() {
               Claim all in range
             </button>{" "}
             <button
-              style={{ ...btn, background: "#b33" }}
+              style={{ ...btn, background: "#dc2626" }}
               onClick={() =>
                 api("POST", "/slots/withdraw-bulk", {
                   ...idBody, start_date: startDate, end_date: endDate,
@@ -144,7 +144,7 @@ export default function AdminSlotsPage() {
         )}
       </section>
 
-      {notice && <p style={{ color: "#b00" }}>{notice}</p>}
+      {notice && <p style={{ color: "#dc2626" }}>{notice}</p>}
 
       {Object.entries(byDate).map(([date, rows]) => (
         <section key={date} style={card}>
@@ -153,7 +153,7 @@ export default function AdminSlotsPage() {
             {actingId && (
               <>
                 <button
-                  style={{ ...btnSm, background: "#0a6" }}
+                  style={{ ...btnSm, background: "#059669" }}
                   onClick={() =>
                     api("POST", "/slots/claim-bulk", {
                       ...idBody, start_date: date, end_date: date,
@@ -163,7 +163,7 @@ export default function AdminSlotsPage() {
                   Claim day
                 </button>{" "}
                 <button
-                  style={{ ...btnSm, background: "#b33" }}
+                  style={{ ...btnSm, background: "#dc2626" }}
                   onClick={() =>
                     api("POST", "/slots/withdraw-bulk", {
                       ...idBody, start_date: date, end_date: date,
@@ -217,18 +217,18 @@ export default function AdminSlotsPage() {
 }
 
 const card: React.CSSProperties = {
-  border: "1px solid #ddd", borderRadius: 8, padding: "12px 16px", margin: "16px 0",
+  background: "#fff", boxShadow: "0 1px 3px rgba(16,24,40,0.06)", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", margin: "16px 0",
 };
-const input: React.CSSProperties = { padding: "6px 8px", border: "1px solid #ccc", borderRadius: 4 };
+const input: React.CSSProperties = { padding: "6px 8px", border: "1px solid #d1d5db", borderRadius: 8 };
 const btn: React.CSSProperties = {
-  padding: "6px 14px", border: "none", borderRadius: 4, background: "#334", color: "#fff", cursor: "pointer",
+  padding: "6px 14px", border: "none", borderRadius: 8, background: "#4338ca", color: "#fff", cursor: "pointer",
 };
 const btnSm: React.CSSProperties = { ...btn, padding: "4px 10px" };
-const th: React.CSSProperties = { textAlign: "left", borderBottom: "2px solid #ddd", padding: 6 };
-const td: React.CSSProperties = { borderBottom: "1px solid #eee", padding: 6 };
-const badge: React.CSSProperties = { padding: "2px 8px", borderRadius: 10, fontSize: 12 };
+const th: React.CSSProperties = { textAlign: "left", borderBottom: "2px solid #e5e7eb", padding: 6 };
+const td: React.CSSProperties = { borderBottom: "1px solid #f1f3f5", padding: 6 };
+const badge: React.CSSProperties = { padding: "2px 8px", borderRadius: 999, fontSize: 12 };
 const badgeColor: Record<string, React.CSSProperties> = {
-  empty: { background: "#eee", color: "#555" },
-  open: { background: "#d8f5e8", color: "#0a6" },
+  empty: { background: "#f1f3f5", color: "#6b7280" },
+  open: { background: "#d1fae5", color: "#059669" },
   booked: { background: "#dbeafe", color: "#1d4ed8" },
 };

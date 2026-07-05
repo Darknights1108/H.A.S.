@@ -97,7 +97,7 @@ export default function AdminApplicationsPage() {
     <main style={{ maxWidth: 1000 }}>
       <AdminBar session={session} />
       <h1>Applications review</h1>
-      {notice && <p style={{ color: "#06c", wordBreak: "break-all" }}>{notice}</p>}
+      {notice && <p style={{ color: "#2563eb", wordBreak: "break-all" }}>{notice}</p>}
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
           <tr>
@@ -112,7 +112,7 @@ export default function AdminApplicationsPage() {
               <tr key={r.id}>
                 <td style={td}>
                   {r.candidate.name}
-                  <div style={{ color: "#888", fontSize: 12 }}>{r.candidate.email}</div>
+                  <div style={{ color: "#6b7280", fontSize: 12 }}>{r.candidate.email}</div>
                 </td>
                 <td style={td}>{r.job_title}</td>
                 <td style={td}>{r.cgpa ?? "—"}</td>
@@ -123,14 +123,14 @@ export default function AdminApplicationsPage() {
                 <td style={td}>
                   {r.status}
                   {r.rejected_reason && (
-                    <div style={{ color: "#888", fontSize: 12 }}>{r.rejected_reason}</div>
+                    <div style={{ color: "#6b7280", fontSize: 12 }}>{r.rejected_reason}</div>
                   )}
                 </td>
                 <td style={td}>
                   {r.interview ? (
                     <>
                       {r.interview.date}
-                      <div style={{ color: "#888", fontSize: 12 }}>
+                      <div style={{ color: "#6b7280", fontSize: 12 }}>
                         {r.interview.start}–{r.interview.end}
                       </div>
                     </>
@@ -153,10 +153,10 @@ export default function AdminApplicationsPage() {
                   </button>{" "}
                   {r.status === "shortlisted" && (
                     <>
-                      <button style={{ ...btnSm, background: "#0a6" }} onClick={() => act(r.id, "approve")}>
+                      <button style={{ ...btnSm, background: "#059669" }} onClick={() => act(r.id, "approve")}>
                         Approve
                       </button>{" "}
-                      <button style={{ ...btnSm, background: "#b33" }} onClick={() => act(r.id, "reject")}>
+                      <button style={{ ...btnSm, background: "#dc2626" }} onClick={() => act(r.id, "reject")}>
                         Reject
                       </button>
                     </>
@@ -164,13 +164,13 @@ export default function AdminApplicationsPage() {
                   {r.status === "scheduled" && r.interview && pending?.id !== r.id && (
                     <>
                       <button
-                        style={{ ...btnSm, background: "#0a6" }}
+                        style={{ ...btnSm, background: "#059669" }}
                         onClick={() => setPending({ id: r.id, result: "passed" })}
                       >
                         Accept
                       </button>{" "}
                       <button
-                        style={{ ...btnSm, background: "#b33" }}
+                        style={{ ...btnSm, background: "#dc2626" }}
                         onClick={() => setPending({ id: r.id, result: "failed" })}
                       >
                         Reject
@@ -180,17 +180,17 @@ export default function AdminApplicationsPage() {
                   {pending?.id === r.id && (
                     <span style={confirmBox}>
                       确认将 <b>{r.candidate.name}</b> 标记为{" "}
-                      <b style={{ color: pending.result === "passed" ? "#0a6" : "#b33" }}>
+                      <b style={{ color: pending.result === "passed" ? "#059669" : "#dc2626" }}>
                         {pending.result === "passed" ? "Accept(发 offer)" : "Reject(发婉拒信)"}
                       </b>
                       ?此操作不可撤销。{" "}
                       <button
-                        style={{ ...btnSm, background: pending.result === "passed" ? "#0a6" : "#b33" }}
+                        style={{ ...btnSm, background: pending.result === "passed" ? "#059669" : "#dc2626" }}
                         onClick={() => outcome(r.id, pending.result)}
                       >
                         确认
                       </button>{" "}
-                      <button style={{ ...btnSm, background: "#888" }} onClick={() => setPending(null)}>
+                      <button style={{ ...btnSm, background: "#6b7280" }} onClick={() => setPending(null)}>
                         取消
                       </button>
                     </span>
@@ -199,13 +199,13 @@ export default function AdminApplicationsPage() {
               </tr>
               {expanded === r.id && (
                 <tr key={r.id + "-detail"}>
-                  <td style={{ ...td, background: "#fafafa" }} colSpan={9}>
+                  <td style={{ ...td, background: "#f9fafb" }} colSpan={9}>
                     <b style={{ fontSize: 13 }}>Score reasoning</b>
                     <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 12px", fontSize: 13 }}>
                       {r.reasoning ?? "no score"}
                     </pre>
                     {r.resume.uploaded && r.resume.parsed && r.resume.status === "done" && (
-                      <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
+                      <div style={{ borderTop: "1px solid #f1f3f5", paddingTop: 8 }}>
                         <b style={{ fontSize: 13 }}>
                           Resume analysis{" "}
                           <a href={`${API}/api/applications/${r.id}/resume`} style={{ fontSize: 12 }}>
@@ -224,8 +224,8 @@ export default function AdminApplicationsPage() {
                           </p>
                         )}
                         {(r.resume.parsed.consistency_notes?.length ?? 0) > 0 && (
-                          <div style={{ background: "#fff8e1", border: "1px solid #f0d264",
-                                        borderRadius: 6, padding: "6px 10px", marginTop: 6 }}>
+                          <div style={{ background: "#fffbeb", border: "1px solid #fde68a",
+                                        borderRadius: 8, padding: "6px 10px", marginTop: 6 }}>
                             <b style={{ fontSize: 13 }}>Form cross-check</b>
                             <ul style={{ margin: "4px 0", fontSize: 13 }}>
                               {r.resume.parsed.consistency_notes!.map((n, i) => <li key={i}>{n}</li>)}
@@ -235,12 +235,12 @@ export default function AdminApplicationsPage() {
                       </div>
                     )}
                     {r.resume.status === "failed" && (
-                      <p style={{ fontSize: 13, color: "#b33" }}>
+                      <p style={{ fontSize: 13, color: "#dc2626" }}>
                         Resume parse failed: {r.resume.parsed?.error ?? "unknown"}{" "}
                         <a href={`${API}/api/applications/${r.id}/resume`}>[download original]</a>
                       </p>
                     )}
-                    <p style={{ fontSize: 12, color: "#888", marginBottom: 0 }}>
+                    <p style={{ fontSize: 12, color: "#6b7280", marginBottom: 0 }}>
                       Booking link: {r.booking_url}
                     </p>
                   </td>
@@ -254,25 +254,25 @@ export default function AdminApplicationsPage() {
   );
 }
 
-const th: React.CSSProperties = { textAlign: "left", borderBottom: "2px solid #ddd", padding: 8 };
-const td: React.CSSProperties = { borderBottom: "1px solid #eee", padding: 8, verticalAlign: "top" };
-const badge: React.CSSProperties = { padding: "2px 10px", borderRadius: 10, fontSize: 12 };
+const th: React.CSSProperties = { textAlign: "left", borderBottom: "2px solid #e5e7eb", padding: 8 };
+const td: React.CSSProperties = { borderBottom: "1px solid #f1f3f5", padding: 8, verticalAlign: "top" };
+const badge: React.CSSProperties = { padding: "2px 10px", borderRadius: 999, fontSize: 12 };
 const bandColor: Record<string, React.CSSProperties> = {
-  high: { background: "#d8f5e8", color: "#0a6" },
+  high: { background: "#d1fae5", color: "#059669" },
   medium: { background: "#fef3c7", color: "#92600a" },
-  low: { background: "#fee2e2", color: "#b33" },
+  low: { background: "#fee2e2", color: "#dc2626" },
 };
 const resumeColor: Record<string, React.CSSProperties> = {
-  none: { background: "#eee", color: "#777" },
+  none: { background: "#f1f3f5", color: "#6b7280" },
   pending: { background: "#fef3c7", color: "#92600a" },
-  done: { background: "#d8f5e8", color: "#0a6" },
-  failed: { background: "#fee2e2", color: "#b33" },
+  done: { background: "#d1fae5", color: "#059669" },
+  failed: { background: "#fee2e2", color: "#dc2626" },
 };
 const btnSm: React.CSSProperties = {
-  padding: "4px 10px", border: "none", borderRadius: 4,
-  background: "#334", color: "#fff", cursor: "pointer", fontSize: 12,
+  padding: "4px 10px", border: "none", borderRadius: 8,
+  background: "#4338ca", color: "#fff", cursor: "pointer", fontSize: 12,
 };
 const confirmBox: React.CSSProperties = {
-  display: "inline-block", background: "#fff8e1", border: "1px solid #f0d264",
-  borderRadius: 6, padding: "6px 10px", fontSize: 12,
+  display: "inline-block", background: "#fffbeb", border: "1px solid #fde68a",
+  borderRadius: 8, padding: "6px 10px", fontSize: 12,
 };

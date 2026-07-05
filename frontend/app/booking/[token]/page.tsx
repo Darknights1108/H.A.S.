@@ -50,7 +50,7 @@ function MonthCalendar({
       <p style={{ fontWeight: 600, margin: "0 0 8px" }}>{monthLabel}</p>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
         {WEEKDAY_HEADERS.map((h, i) => (
-          <div key={i} style={{ textAlign: "center", color: "#888", fontSize: 12, padding: 4 }}>
+          <div key={i} style={{ textAlign: "center", color: "#6b7280", fontSize: 12, padding: 4 }}>
             {h}
           </div>
         ))}
@@ -73,8 +73,8 @@ function MonthCalendar({
                 border: "none",
                 fontSize: 13,
                 cursor: available ? "pointer" : "default",
-                background: isActive ? "#334" : available ? "#eef" : "transparent",
-                color: isActive ? "#fff" : available ? "#334" : isWeekend || isPast ? "#ccc" : "#999",
+                background: isActive ? "#4338ca" : available ? "#e0e7ff" : "transparent",
+                color: isActive ? "#fff" : available ? "#4338ca" : isWeekend || isPast ? "#d1d5db" : "#9ca3af",
                 fontWeight: available ? 600 : 400,
               }}
             >
@@ -83,7 +83,7 @@ function MonthCalendar({
           );
         })}
       </div>
-      <p style={{ color: "#888", fontSize: 12 }}>Interviews are held on working days (Mon–Fri) only.</p>
+      <p style={{ color: "#6b7280", fontSize: 12 }}>Interviews are held on working days (Mon–Fri) only.</p>
     </div>
   );
 }
@@ -152,7 +152,7 @@ export default function BookingPage() {
     }
   }
 
-  if (error) return <main style={wrap}><p style={{ color: "#b00" }}>{error}</p></main>;
+  if (error) return <main style={wrap}><p style={{ color: "#dc2626" }}>{error}</p></main>;
   if (!state) return <main style={wrap}><p>Loading…</p></main>;
 
   const { held_slot, confirmed, interview, open_slots } = state;
@@ -165,7 +165,7 @@ export default function BookingPage() {
   return (
     <main style={wrap}>
       <h1 style={{ textAlign: "center" }}>Internship Interview</h1>
-      <p style={{ textAlign: "center", color: "#666" }}>{state.timezone}</p>
+      <p style={{ textAlign: "center", color: "#6b7280" }}>{state.timezone}</p>
 
       {confirmed && interview && held_slot && (
         <section style={card}>
@@ -178,7 +178,7 @@ export default function BookingPage() {
             </a>
           </p>
           {interview.reschedule_max > 0 && (
-            <p style={{ color: "#666" }}>
+            <p style={{ color: "#6b7280" }}>
               Reschedules used: {interview.reschedule_count}/{interview.reschedule_max}
             </p>
           )}
@@ -195,7 +195,7 @@ export default function BookingPage() {
         </section>
       )}
 
-      {notice && <p style={{ color: "#b00" }}>{notice}</p>}
+      {notice && <p style={{ color: "#dc2626" }}>{notice}</p>}
 
       {pickable && (
         <section>
@@ -230,7 +230,7 @@ export default function BookingPage() {
                 ))}
               </div>
               {held_slot && !confirmed && (
-                <p style={{ color: "#666", fontSize: 13 }}>
+                <p style={{ color: "#6b7280", fontSize: 13 }}>
                   Selected: {held_slot.date} {held_slot.start}–{held_slot.end}{" "}
                   <button style={linkBtn} disabled={busy} onClick={() => act("withdraw")}>
                     withdraw
@@ -271,24 +271,24 @@ export default function BookingPage() {
 
 const wrap: React.CSSProperties = { maxWidth: 720, margin: "0 auto" };
 const card: React.CSSProperties = {
-  border: "1px solid #ddd", borderRadius: 8, padding: "12px 16px", margin: "16px 0",
+  background: "#fff", boxShadow: "0 1px 3px rgba(16,24,40,0.06)", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", margin: "16px 0",
 };
 const lbl: React.CSSProperties = { display: "block", marginTop: 12, fontWeight: 600 };
 const input: React.CSSProperties = {
   display: "block", width: "100%", maxWidth: 420, padding: "8px 10px", marginTop: 4,
-  border: "1px solid #ccc", borderRadius: 6, boxSizing: "border-box",
+  border: "1px solid #d1d5db", borderRadius: 8, boxSizing: "border-box",
 };
 const timeBtn: React.CSSProperties = {
-  padding: "10px 0", border: "1px solid #ccc", borderRadius: 6, background: "#fff", cursor: "pointer",
+  padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer",
 };
-const timeActive: React.CSSProperties = { ...timeBtn, background: "#334", color: "#fff", border: "none" };
+const timeActive: React.CSSProperties = { ...timeBtn, background: "#4338ca", color: "#fff", border: "none" };
 const primary: React.CSSProperties = {
-  padding: "10px 22px", border: "none", borderRadius: 6, background: "#334", color: "#fff", cursor: "pointer",
+  padding: "10px 22px", border: "none", borderRadius: 8, background: "#4338ca", color: "#fff", cursor: "pointer",
 };
 const linkBtn: React.CSSProperties = {
-  border: "none", background: "none", color: "#06c", cursor: "pointer", textDecoration: "underline", padding: 0,
+  border: "none", background: "none", color: "#2563eb", cursor: "pointer", textDecoration: "underline", padding: 0,
 };
 const joinBtn: React.CSSProperties = {
-  display: "inline-block", padding: "10px 18px", borderRadius: 6,
-  background: "#0a7", color: "#fff", textDecoration: "none",
+  display: "inline-block", padding: "10px 18px", borderRadius: 8,
+  background: "#059669", color: "#fff", textDecoration: "none",
 };

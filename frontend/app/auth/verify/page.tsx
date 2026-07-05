@@ -35,7 +35,7 @@ function VerifyInner() {
       {error ? (
         <>
           <h1>Sign-in failed</h1>
-          <p style={{ color: "#b00" }}>{error}</p>
+          <p style={{ color: "#dc2626" }}>{error}</p>
           <p><a href="/login">Request a new login link</a></p>
         </>
       ) : (

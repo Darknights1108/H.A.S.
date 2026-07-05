@@ -188,9 +188,9 @@ export default function AdminJobsPage() {
             Fill rules manually
           </button>
         </p>
-        {notice && <p style={{ color: notice.includes("失败") || notice.includes("HTTP") || notice.includes("not configured") ? "#b00" : "#06c" }}>{notice}</p>}
+        {notice && <p style={{ color: notice.includes("失败") || notice.includes("HTTP") || notice.includes("not configured") ? "#dc2626" : "#2563eb" }}>{notice}</p>}
         {unmapped.length > 0 && (
-          <div style={{ background: "#fff8e1", border: "1px solid #f0d264", borderRadius: 6, padding: "8px 12px" }}>
+          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px" }}>
             <b>无法映射到表单的要求(需人工留意):</b>
             <ul style={{ margin: "4px 0" }}>
               {unmapped.map((u, i) => <li key={i}>{u}</li>)}
@@ -252,12 +252,12 @@ export default function AdminJobsPage() {
       <section style={card}>
         <h2 style={{ marginTop: 0 }}>Existing jobs</h2>
         {jobs.map((j) => (
-          <div key={j.id} style={{ borderBottom: "1px solid #eee", padding: "10px 0" }}>
+          <div key={j.id} style={{ borderBottom: "1px solid #f1f3f5", padding: "10px 0" }}>
             <b>{j.title}</b>{" "}
-            <span style={{ ...badge, background: j.is_open ? "#d8f5e8" : "#eee", color: j.is_open ? "#0a6" : "#777" }}>
+            <span style={{ ...badge, background: j.is_open ? "#d1fae5" : "#f1f3f5", color: j.is_open ? "#059669" : "#6b7280" }}>
               {j.is_open ? "open" : "closed"}
             </span>{" "}
-            <span style={{ color: "#888", fontSize: 12 }}>{j.application_count} application(s)</span>{" "}
+            <span style={{ color: "#6b7280", fontSize: 12 }}>{j.application_count} application(s)</span>{" "}
             <button style={btnSm} onClick={() => setExpandedJob(expandedJob === j.id ? null : j.id)}>
               {expandedJob === j.id ? "收起条件" : "展开条件"}
             </button>{" "}
@@ -266,13 +266,13 @@ export default function AdminJobsPage() {
               {j.is_open ? "Close" : "Reopen"}
             </button>{" "}
             {deleteConfirm === j.id ? (
-              <span style={{ background: "#fff8e1", border: "1px solid #f0d264", borderRadius: 6, padding: "3px 8px", fontSize: 12 }}>
+              <span style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "3px 8px", fontSize: 12 }}>
                 确认删除「{j.title}」?{" "}
-                <button style={{ ...btnSm, background: "#b33" }} onClick={() => deleteJob(j.id)}>删除</button>{" "}
-                <button style={{ ...btnSm, background: "#888" }} onClick={() => setDeleteConfirm(null)}>取消</button>
+                <button style={{ ...btnSm, background: "#dc2626" }} onClick={() => deleteJob(j.id)}>删除</button>{" "}
+                <button style={{ ...btnSm, background: "#6b7280" }} onClick={() => setDeleteConfirm(null)}>取消</button>
               </span>
             ) : (
-              <button style={{ ...btnSm, background: "#b33" }} onClick={() => setDeleteConfirm(j.id)}>
+              <button style={{ ...btnSm, background: "#dc2626" }} onClick={() => setDeleteConfirm(j.id)}>
                 Delete
               </button>
             )}
@@ -289,7 +289,7 @@ function RulesView({ req }: { req: Requirements }) {
   const bo = req.bonus ?? {};
   const li: React.CSSProperties = { margin: "2px 0" };
   return (
-    <div style={{ background: "#fafafa", border: "1px solid #eee", borderRadius: 6, padding: "8px 14px", marginTop: 8, fontSize: 13 }}>
+    <div style={{ background: "#f9fafb", border: "1px solid #f1f3f5", borderRadius: 8, padding: "8px 14px", marginTop: 8, fontSize: 13 }}>
       <b>硬门槛(任一不满足 → Low)</b>
       <ul style={{ margin: "4px 0 10px" }}>
         {ko.min_cgpa != null && <li style={li}>CGPA ≥ {ko.min_cgpa}</li>}
@@ -313,21 +313,21 @@ function RulesView({ req }: { req: Requirements }) {
 }
 
 const card: React.CSSProperties = {
-  border: "1px solid #ddd", borderRadius: 8, padding: "12px 16px", margin: "16px 0",
+  background: "#fff", boxShadow: "0 1px 3px rgba(16,24,40,0.06)", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", margin: "16px 0",
 };
 const lbl: React.CSSProperties = { display: "block", marginTop: 10, fontWeight: 600 };
 const chk: React.CSSProperties = { display: "block", marginTop: 10 };
 const input: React.CSSProperties = {
   display: "block", width: "100%", padding: "8px 10px", marginTop: 4,
-  border: "1px solid #ccc", borderRadius: 6, boxSizing: "border-box",
+  border: "1px solid #d1d5db", borderRadius: 8, boxSizing: "border-box",
 };
 const primary: React.CSSProperties = {
-  padding: "10px 20px", border: "none", borderRadius: 6, background: "#334", color: "#fff", cursor: "pointer",
+  padding: "10px 20px", border: "none", borderRadius: 8, background: "#4338ca", color: "#fff", cursor: "pointer",
 };
 const secondary: React.CSSProperties = {
-  padding: "10px 20px", border: "1px solid #ccc", borderRadius: 6, background: "#f5f5f5", cursor: "pointer",
+  padding: "10px 20px", border: "1px solid #d1d5db", borderRadius: 8, background: "#f3f4f6", cursor: "pointer",
 };
 const btnSm: React.CSSProperties = {
-  padding: "3px 10px", border: "none", borderRadius: 4, background: "#334", color: "#fff", cursor: "pointer", fontSize: 12,
+  padding: "3px 10px", border: "none", borderRadius: 8, background: "#4338ca", color: "#fff", cursor: "pointer", fontSize: 12,
 };
-const badge: React.CSSProperties = { padding: "2px 10px", borderRadius: 10, fontSize: 12 };
+const badge: React.CSSProperties = { padding: "2px 10px", borderRadius: 999, fontSize: 12 };

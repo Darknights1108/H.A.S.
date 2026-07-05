@@ -57,10 +57,10 @@ export default function AnalyticsPage() {
         {funnel.map((f) => (
           <div key={f.stage} style={{ display: "flex", alignItems: "center", margin: "6px 0" }}>
             <span style={{ width: 260, fontSize: 13 }}>{f.stage}</span>
-            <div style={{ flex: 1, background: "#f0f0f0", borderRadius: 4, height: 22 }}>
+            <div style={{ flex: 1, background: "#eef0f3", borderRadius: 8, height: 22 }}>
               <div style={{
                 width: `${(f.count / funnelMax) * 100}%`, minWidth: f.count > 0 ? 28 : 0,
-                background: "#334", borderRadius: 4, height: 22,
+                background: "#4338ca", borderRadius: 8, height: 22,
                 color: "#fff", fontSize: 12, display: "flex",
                 alignItems: "center", justifyContent: "flex-end", paddingRight: 6,
                 boxSizing: "border-box",
@@ -68,7 +68,7 @@ export default function AnalyticsPage() {
                 {f.count > 0 ? f.count : ""}
               </div>
             </div>
-            {f.count === 0 && <span style={{ marginLeft: 6, fontSize: 12, color: "#888" }}>0</span>}
+            {f.count === 0 && <span style={{ marginLeft: 6, fontSize: 12, color: "#6b7280" }}>0</span>}
           </div>
         ))}
       </section>
@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
           <h2 style={h2}>Screening bands</h2>
           {(["high", "medium", "low"] as const).map((b) => (
             <Bar key={b} label={b} count={bands[b]} total={bandTotal}
-                 color={{ high: "#0a6", medium: "#d97706", low: "#b33" }[b]} />
+                 color={{ high: "#059669", medium: "#d97706", low: "#dc2626" }[b]} />
           ))}
         </section>
 
@@ -87,7 +87,7 @@ export default function AnalyticsPage() {
           {Object.keys(rejection_reasons).length === 0 && <p style={{ fontSize: 13 }}>none</p>}
           {Object.entries(rejection_reasons).sort((a, b) => b[1] - a[1]).map(([reason, n]) => (
             <Bar key={reason} label={reason} count={n}
-                 total={Math.max(1, ...Object.values(rejection_reasons))} color="#888" />
+                 total={Math.max(1, ...Object.values(rejection_reasons))} color="#6b7280" />
           ))}
         </section>
       </div>
@@ -97,10 +97,10 @@ export default function AnalyticsPage() {
         <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 90 }}>
           {daily_applications.map((d) => (
             <div key={d.date} title={`${d.date}: ${d.count}`}
-                 style={{ flex: 1, textAlign: "center", fontSize: 10, color: "#888" }}>
+                 style={{ flex: 1, textAlign: "center", fontSize: 10, color: "#6b7280" }}>
               <div style={{
                 height: Math.round((d.count / dailyMax) * 70),
-                background: d.count ? "#334" : "#eee", borderRadius: 3,
+                background: d.count ? "#4338ca" : "#f1f3f5", borderRadius: 3,
               }} />
               {d.date.slice(8)}
             </div>
@@ -127,7 +127,7 @@ export default function AnalyticsPage() {
 
         <section style={{ ...card, flex: 1, minWidth: 300 }}>
           <h2 style={h2}>Upcoming slots</h2>
-          <Bar label={`open (${slots.open})`} count={slots.open} total={slotTotal} color="#0a6" />
+          <Bar label={`open (${slots.open})`} count={slots.open} total={slotTotal} color="#059669" />
           <Bar label={`booked (${slots.booked})`} count={slots.booked} total={slotTotal} color="#1d4ed8" />
           <Bar label={`empty (${slots.empty})`} count={slots.empty} total={slotTotal} color="#bbb" />
           <h2 style={{ ...h2, marginTop: 16 }}>Interviewer load</h2>
@@ -153,7 +153,7 @@ function Card({ label, value }: { label: string; value: number | string }) {
   return (
     <div style={{ ...card, flex: 1, minWidth: 130, textAlign: "center", margin: 0 }}>
       <div style={{ fontSize: 26, fontWeight: 700 }}>{value}</div>
-      <div style={{ fontSize: 12, color: "#888" }}>{label}</div>
+      <div style={{ fontSize: 12, color: "#6b7280" }}>{label}</div>
     </div>
   );
 }
@@ -162,8 +162,8 @@ function Bar({ label, count, total, color }: { label: string; count: number; tot
   return (
     <div style={{ display: "flex", alignItems: "center", margin: "6px 0" }}>
       <span style={{ width: 130, fontSize: 13 }}>{label}</span>
-      <div style={{ flex: 1, background: "#f0f0f0", borderRadius: 4, height: 18 }}>
-        <div style={{ width: `${(count / total) * 100}%`, background: color, borderRadius: 4, height: 18 }} />
+      <div style={{ flex: 1, background: "#eef0f3", borderRadius: 8, height: 18 }}>
+        <div style={{ width: `${(count / total) * 100}%`, background: color, borderRadius: 8, height: 18 }} />
       </div>
       <span style={{ width: 36, textAlign: "right", fontSize: 13 }}>{count}</span>
     </div>
@@ -171,8 +171,8 @@ function Bar({ label, count, total, color }: { label: string; count: number; tot
 }
 
 const card: React.CSSProperties = {
-  border: "1px solid #ddd", borderRadius: 8, padding: "12px 16px", margin: "16px 0",
+  background: "#fff", boxShadow: "0 1px 3px rgba(16,24,40,0.06)", border: "1px solid #e5e7eb", borderRadius: 12, padding: "12px 16px", margin: "16px 0",
 };
 const h2: React.CSSProperties = { marginTop: 0, fontSize: 16 };
-const th: React.CSSProperties = { textAlign: "left", borderBottom: "2px solid #ddd", padding: 6 };
-const td: React.CSSProperties = { borderBottom: "1px solid #eee", padding: 6 };
+const th: React.CSSProperties = { textAlign: "left", borderBottom: "2px solid #e5e7eb", padding: 6 };
+const td: React.CSSProperties = { borderBottom: "1px solid #f1f3f5", padding: 6 };
