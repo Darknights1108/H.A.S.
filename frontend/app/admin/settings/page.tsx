@@ -14,20 +14,20 @@ type Setting = {
 };
 
 const LABELS: Record<string, string> = {
-  shortlist_review_days: "Shortlist 审查期限(天)",
-  slot_duration_minutes: "面试时段长度(分钟)",
-  panel_max_interviewers: "单时段面试官上限(panel)",
-  reschedule_max: "改期次数上限(0 = 不限)",
-  candidate_response_days: "候选人响应期限(天,邀请发出后未预约则淘汰)",
-  work_start_hour: "工作时间起点(小时,生成时段用)",
-  work_end_hour: "工作时间终点(小时,不含)",
-  company_name: "公司名(信件署名)",
-  invite_email_subject: "邀请信主题",
-  invite_email_template: "邀请信正文模板",
+  shortlist_review_days: "Shortlist review window (days)",
+  slot_duration_minutes: "Interview slot length (minutes)",
+  panel_max_interviewers: "Max interviewers per slot (panel)",
+  reschedule_max: "Max reschedules (0 = unlimited)",
+  candidate_response_days: "Candidate response window (days after invite)",
+  work_start_hour: "Working hours start (hour, for slot generation)",
+  work_end_hour: "Working hours end (hour, exclusive)",
+  company_name: "Company name (letter signature)",
+  invite_email_subject: "Invite email subject",
+  invite_email_template: "Invite email body template",
 };
 
 const PLACEHOLDER_HINT =
-  "可用占位符:{candidate_name} 候选人姓名 · {job_title} 职位 · {booking_url} 预约链接 · {company_name} 公司名";
+  "Placeholders: {candidate_name} · {job_title} · {booking_url} · {company_name}";
 const TEMPLATE_KEYS = new Set(["invite_email_subject", "invite_email_template"]);
 
 export default function AdminSettingsPage() {
@@ -62,7 +62,7 @@ export default function AdminSettingsPage() {
       });
       const data = await r.json();
       if (!r.ok) setNotice(`${s.key}: ${data.detail ?? `HTTP ${r.status}`}`);
-      else setNotice(`✅ ${LABELS[s.key] ?? s.key} 已更新,立即生效`);
+      else setNotice(`✅ ${LABELS[s.key] ?? s.key} updated — effective immediately`);
       await load();
     } finally {
       setBusy(null);
@@ -76,7 +76,8 @@ export default function AdminSettingsPage() {
       <AdminBar session={session} />
       <h1>Settings</h1>
       <p style={{ color: "#6b7280" }}>
-        改动即时生效(定时任务、panel 上限、改期限制、信件署名都动态读取这些值)。
+        Changes take effect immediately — timers, panel caps, reschedule limits
+        and letter templates all read these values live.
       </p>
       {notice && (
         <p style={{ color: notice.startsWith("✅") ? "#059669" : "#dc2626" }}>{notice}</p>
@@ -89,7 +90,7 @@ export default function AdminSettingsPage() {
             <label style={{ fontWeight: 600 }}>{LABELS[s.key] ?? s.key}</label>
             <div style={{ color: "#6b7280", fontSize: 12, margin: "2px 0 8px" }}>
               {s.description}
-              {" · "}上次修改 {s.updated_at.slice(0, 16).replace("T", " ")}
+              {" · "}last modified {s.updated_at.slice(0, 16).replace("T", " ")}
             </div>
             {s.multiline ? (
               <textarea

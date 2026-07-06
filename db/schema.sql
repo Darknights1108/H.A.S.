@@ -40,16 +40,16 @@ CREATE TABLE app_setting (
 
 -- 默认值(seed)
 INSERT INTO app_setting (key, value, description) VALUES
-    ('shortlist_review_days', '7',    'shortlist 多少天内无人审查则自动淘汰'),
-    ('slot_duration_minutes', '60',   '面试时段长度(分钟)'),
-    ('panel_max_interviewers', '5',   '单个时段最多面试官数(panel 上限)'),
-    ('reschedule_max',        '0',    '确认后允许改期的最大次数(0 = 不限次)'),
-    ('company_name',          '"HAS"', '候选人信件署名中的公司名'),
-    ('candidate_response_days', '7',   '邀请发出后候选人多少天未预约则自动淘汰'),
-    ('work_start_hour',       '9',    '时段生成的工作时间起点(小时,MYT)'),
-    ('work_end_hour',         '18',   '时段生成的工作时间终点(小时,不含)'),
-    ('invite_email_subject',  '"Interview invitation — {job_title}"', '邀请信主题(支持占位符)'),
-    ('invite_email_template', '"Hi {candidate_name},\n\nCongratulations! You have been shortlisted for {job_title}.\n\nPlease pick an interview time that suits you using your personal booking link:\n{booking_url}\n\nAll interviews are conducted online (times in MYT, UTC+08:00).\n\nBest Regards,\n{company_name} Recruiting Team\n"', '邀请信正文模板,占位符:{candidate_name} {job_title} {booking_url} {company_name}')
+    ('shortlist_review_days', '7',    'Auto-reject shortlisted applications not reviewed within this many days'),
+    ('slot_duration_minutes', '60',   'Length of each interview slot in minutes'),
+    ('panel_max_interviewers', '5',   'Maximum interviewers per slot (panel cap)'),
+    ('reschedule_max',        '0',    'Max reschedules after confirmation (0 = unlimited)'),
+    ('company_name',          '"HAS"', 'Company name used in candidate letter signatures'),
+    ('candidate_response_days', '7',   'Auto-reject if candidate has not booked within this many days after invite'),
+    ('work_start_hour',       '9',    'Slot generation: working hours start (MYT)'),
+    ('work_end_hour',         '18',   'Slot generation: working hours end (exclusive)'),
+    ('invite_email_subject',  '"Interview invitation — {job_title}"', 'Invite email subject (supports placeholders)'),
+    ('invite_email_template', '"Hi {candidate_name},\n\nCongratulations! You have been shortlisted for {job_title}.\n\nPlease pick an interview time that suits you using your personal booking link:\n{booking_url}\n\nAll interviews are conducted online (times in MYT, UTC+08:00).\n\nBest Regards,\n{company_name} Recruiting Team\n"', 'Invite email body template. Placeholders: {candidate_name} {job_title} {booking_url} {company_name}')
 ON CONFLICT (key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------

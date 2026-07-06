@@ -10,6 +10,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 type JobRow = {
   id: string; title: string; description: string | null;
   requirements: Requirements; is_open: boolean; created_at: string;
+  application_count: number;
 };
 type Requirements = {
   knockout?: {
@@ -43,6 +44,9 @@ export default function AdminJobsPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const r = await fetch(`${API}/api/jobs/all`);
@@ -55,6 +59,39 @@ export default function AdminJobsPage() {
 
   function set<K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) {
     setDraft((d) => ({ ...d, [k]: v }));
+  }
+
+  function reqToDraft(j: JobRow) {
+    const ko = j.requirements.knockout ?? {};
+    const bo = j.requirements.bonus ?? {};
+    return {
+      title: j.title,
+      description: j.description ?? "",
+      min_cgpa: ko.min_cgpa != null ? String(ko.min_cgpa) : "",
+      fields: (ko.fields ?? []).join(", "),
+      require_fulltime: !!ko.require_fulltime,
+      langs_any: (ko.langs_any ?? []).join(", "),
+      require_sql: !!ko.require_sql,
+      ai_study: bo.ai_study != null ? String(bo.ai_study) : "",
+      eca: bo.eca != null ? String(bo.eca) : "",
+      extra_lang: bo.extra_lang != null ? String(bo.extra_lang) : "",
+      high_min_bonus: String(j.requirements.high_min_bonus ?? 15),
+    };
+  }
+
+  function startEdit(j: JobRow) {
+    setDraft(reqToDraft(j));
+    setEditingId(j.id);
+    setShowForm(true);
+    setNotice(`Editing rules of "${j.title}" — change below and Save changes`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setShowForm(false);
+    setDraft(emptyDraft);
+    setNotice(null);
   }
 
   async function parseJd() {

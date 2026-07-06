@@ -85,8 +85,8 @@ export default function AdminApplicationsPage() {
     else
       setNotice(
         result === "passed"
-          ? "✅ 已 Accept — offer 信草稿已生成,请到 Emails 页审核发送"
-          : "✅ 已 Reject — 婉拒信草稿已生成,请到 Emails 页审核发送"
+          ? "✅ Accepted — offer letter drafted, review & send it on the Emails page"
+          : "✅ Rejected — rejection letter drafted, review & send it on the Emails page"
       );
     await load();
   }
@@ -101,9 +101,9 @@ export default function AdminApplicationsPage() {
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
           <tr>
-            <th style={th}>Candidate</th><th style={th}>Job</th><th style={th}>CGPA</th>
-            <th style={th}>Band</th><th style={th}>Score</th><th style={th}>Status</th>
-            <th style={th}>Interview</th><th style={th}>Resume</th><th style={th}>Actions</th>
+            <th style={th}>Candidate</th><th style={th}>Job</th>
+            <th style={th}>Screening</th><th style={th}>Status</th>
+            <th style={th}>Resume</th><th style={{ ...th, width: 210 }}>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -112,42 +112,34 @@ export default function AdminApplicationsPage() {
               <tr key={r.id}>
                 <td style={td}>
                   {r.candidate.name}
-                  <div style={{ color: "#6b7280", fontSize: 12 }}>{r.candidate.email}</div>
+                  <div style={sub}>{r.candidate.email}</div>
                 </td>
                 <td style={td}>{r.job_title}</td>
-                <td style={td}>{r.cgpa ?? "—"}</td>
                 <td style={td}>
                   {r.band && <span style={{ ...badge, ...bandColor[r.band] }}>{r.band}</span>}
+                  <div style={sub}>
+                    score {r.total_score ?? "—"} · CGPA {r.cgpa ?? "—"}
+                  </div>
                 </td>
-                <td style={td}>{r.total_score ?? "—"}</td>
                 <td style={td}>
                   {r.status}
-                  {r.rejected_reason && (
-                    <div style={{ color: "#6b7280", fontSize: 12 }}>{r.rejected_reason}</div>
-                  )}
-                </td>
-                <td style={td}>
-                  {r.interview ? (
-                    <>
-                      {r.interview.date}
-                      <div style={{ color: "#6b7280", fontSize: 12 }}>
-                        {r.interview.start}–{r.interview.end}
-                      </div>
-                    </>
-                  ) : (
-                    "—"
+                  {r.rejected_reason && <div style={sub}>{r.rejected_reason}</div>}
+                  {r.interview && (
+                    <div style={sub}>
+                      🗓 {r.interview.date} {r.interview.start}–{r.interview.end}
+                    </div>
                   )}
                 </td>
                 <td style={td}>
                   {!r.resume.uploaded ? (
                     "—"
                   ) : (
-                    <span style={{ ...badge, ...resumeColor[r.resume.status] }}>
+                    <span style={{ ...badge, ...resumeColor[r.resume.status], whiteSpace: "nowrap" }}>
                       {r.resume.status === "done" ? "parsed ✓" : r.resume.status}
                     </span>
                   )}
                 </td>
-                <td style={td}>
+                <td style={{ ...td, whiteSpace: "nowrap" }}>
                   <button style={btnSm} onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
                     Why?
                   </button>{" "}
@@ -161,7 +153,7 @@ export default function AdminApplicationsPage() {
                       </button>
                     </>
                   )}
-                  {r.status === "scheduled" && r.interview && pending?.id !== r.id && (
+                  {r.status === "scheduled" && r.interview && (
                     <>
                       <button
                         style={{ ...btnSm, background: "#059669" }}
@@ -177,29 +169,33 @@ export default function AdminApplicationsPage() {
                       </button>
                     </>
                   )}
-                  {pending?.id === r.id && (
-                    <span style={confirmBox}>
-                      确认将 <b>{r.candidate.name}</b> 标记为{" "}
-                      <b style={{ color: pending.result === "passed" ? "#059669" : "#dc2626" }}>
-                        {pending.result === "passed" ? "Accept(发 offer)" : "Reject(发婉拒信)"}
-                      </b>
-                      ?此操作不可撤销。{" "}
-                      <button
-                        style={{ ...btnSm, background: pending.result === "passed" ? "#059669" : "#dc2626" }}
-                        onClick={() => outcome(r.id, pending.result)}
-                      >
-                        确认
-                      </button>{" "}
-                      <button style={{ ...btnSm, background: "#6b7280" }} onClick={() => setPending(null)}>
-                        取消
-                      </button>
-                    </span>
-                  )}
                 </td>
               </tr>
+              {pending?.id === r.id && (
+                <tr key={r.id + "-confirm"}>
+                  <td style={{ ...td, ...confirmRow }} colSpan={6}>
+                    ⚠ Confirm marking <b>{r.candidate.name}</b> as{" "}
+                    <b style={{ color: pending.result === "passed" ? "#059669" : "#dc2626" }}>
+                      {pending.result === "passed"
+                        ? "ACCEPTED (offer letter will be drafted)"
+                        : "REJECTED (rejection letter will be drafted)"}
+                    </b>
+                    ? This cannot be undone.{" "}
+                    <button
+                      style={{ ...btnSm, background: pending.result === "passed" ? "#059669" : "#dc2626" }}
+                      onClick={() => outcome(r.id, pending.result)}
+                    >
+                      Confirm
+                    </button>{" "}
+                    <button style={{ ...btnSm, background: "#6b7280" }} onClick={() => setPending(null)}>
+                      Cancel
+                    </button>
+                  </td>
+                </tr>
+              )}
               {expanded === r.id && (
                 <tr key={r.id + "-detail"}>
-                  <td style={{ ...td, background: "#f9fafb" }} colSpan={9}>
+                  <td style={{ ...td, background: "#f9fafb" }} colSpan={6}>
                     <b style={{ fontSize: 13 }}>Score reasoning</b>
                     <pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 12px", fontSize: 13 }}>
                       {r.reasoning ?? "no score"}
@@ -272,7 +268,8 @@ const btnSm: React.CSSProperties = {
   padding: "4px 10px", border: "none", borderRadius: 8,
   background: "#4338ca", color: "#fff", cursor: "pointer", fontSize: 12,
 };
-const confirmBox: React.CSSProperties = {
-  display: "inline-block", background: "#fffbeb", border: "1px solid #fde68a",
-  borderRadius: 8, padding: "6px 10px", fontSize: 12,
+const sub: React.CSSProperties = { color: "#6b7280", fontSize: 12 };
+const confirmRow: React.CSSProperties = {
+  background: "#fffbeb", borderTop: "1px solid #fde68a",
+  borderBottom: "1px solid #fde68a", fontSize: 13,
 };

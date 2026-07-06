@@ -278,6 +278,10 @@ const input: React.CSSProperties = {
   display: "block", width: "100%", maxWidth: 420, padding: "8px 10px", marginTop: 4,
   border: "1px solid #d1d5db", borderRadius: 8, boxSizing: "border-box",
 };
+const secondary: React.CSSProperties = {
+  padding: "8px 16px", border: "1px solid #d1d5db", borderRadius: 8,
+  background: "#f3f4f6", cursor: "pointer",
+};
 const timeBtn: React.CSSProperties = {
   padding: "10px 0", border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", cursor: "pointer",
 };
