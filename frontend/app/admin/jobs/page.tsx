@@ -45,7 +45,16 @@ export default function AdminJobsPage() {
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
+
+  function toggleRules(id: string) {
+    setExpandedJobs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -295,8 +304,8 @@ export default function AdminJobsPage() {
               {j.is_open ? "open" : "closed"}
             </span>{" "}
             <span style={{ color: "#6b7280", fontSize: 12 }}>{j.application_count} application(s)</span>{" "}
-            <button style={btnSm} onClick={() => setExpandedJob(expandedJob === j.id ? null : j.id)}>
-              {expandedJob === j.id ? "Hide rules" : "View rules"}
+            <button style={btnSm} onClick={() => toggleRules(j.id)}>
+              {expandedJobs.has(j.id) ? "Hide rules" : "View rules"}
             </button>{" "}
             <button style={btnSm} onClick={() => startEdit(j)}>Edit</button>{" "}
             <button style={btnSm} onClick={() => toggleOpen(j)}>
@@ -313,7 +322,7 @@ export default function AdminJobsPage() {
                 Delete
               </button>
             )}
-            {expandedJob === j.id && <RulesView req={j.requirements} />}
+            {expandedJobs.has(j.id) && <RulesView req={j.requirements} />}
           </div>
         ))}
       </section>
