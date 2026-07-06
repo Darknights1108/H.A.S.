@@ -90,7 +90,7 @@ export default function ApplyPage() {
 
   return (
     <main style={wrap}>
-      <h1>Internship application</h1>
+      <h1>Job application</h1>
       {error && <p style={{ color: "#dc2626" }}>{error}</p>}
 
       <label style={lbl}>Position</label>
