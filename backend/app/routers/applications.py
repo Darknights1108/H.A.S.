@@ -19,7 +19,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth import require_admin
+from ..auth import get_session, require_admin
 from ..config import settings
 from ..database import get_db
 from ..models import Application, Candidate, Interview, Job, Score, Slot, UserSession
@@ -242,9 +242,37 @@ def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)
     return {"application_id": str(app_.id), "invite_email_id": str(email.id), "booking_url": booking_url}
 
 
+@router.get("/resumes")
+def list_resumes(db: Session = Depends(get_db),
+                 _staff: UserSession = Depends(get_session)) -> list[dict]:
+    """全部已上传简历(admin 与 interviewer 均可查看/下载)。"""
+    rows = db.execute(
+        select(Application, Candidate, Job)
+        .join(Candidate, Candidate.id == Application.candidate_id)
+        .join(Job, Job.id == Application.job_id)
+        .where(Application.resume_file_url.isnot(None))
+        .order_by(Application.submitted_at.desc())
+    ).all()
+    return [
+        {
+            "application_id": str(a.id),
+            "candidate_name": c.name,
+            "candidate_email": c.email,
+            "job_title": j.title,
+            "file_ext": a.resume_file_url.rsplit(".", 1)[-1].lower(),
+            "parse_status": a.resume_parse_status,
+            "application_status": a.status,
+            "submitted_at": a.submitted_at.isoformat(),
+        }
+        for a, c, j in rows
+    ]
+
+
 @router.get("/applications/{application_id}/resume")
-def download_resume(application_id: uuid.UUID, db: Session = Depends(get_db),
-                    _admin: UserSession = Depends(require_admin)) -> StreamingResponse:
+def download_resume(application_id: uuid.UUID, inline: bool = False,
+                    db: Session = Depends(get_db),
+                    _staff: UserSession = Depends(get_session)) -> StreamingResponse:
+    """简历文件(staff:admin + interviewer)。inline=true 时浏览器内预览。"""
     app_ = db.get(Application, application_id)
     if app_ is None or not app_.resume_file_url:
         raise HTTPException(404, "no resume for this application")
@@ -253,10 +281,11 @@ def download_resume(application_id: uuid.UUID, db: Session = Depends(get_db),
     except Exception as e:
         raise HTTPException(502, f"storage error: {e}") from e
     ext = "." + app_.resume_file_url.rsplit(".", 1)[-1].lower()
+    disposition = "inline" if inline else "attachment"
     return StreamingResponse(
         io.BytesIO(data),
         media_type=CONTENT_TYPES.get(ext, "application/octet-stream"),
-        headers={"Content-Disposition": f'attachment; filename="resume{ext}"'},
+        headers={"Content-Disposition": f'{disposition}; filename="resume{ext}"'},
     )
 
 

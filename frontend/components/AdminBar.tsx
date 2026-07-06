@@ -8,6 +8,7 @@ const LINKS: [string, string, boolean][] = [
   ["/admin/applications", "Applications", true],
   ["/admin/jobs", "Jobs", true],
   ["/admin/slots", "Slots", false],
+  ["/admin/resumes", "Resumes", false],
   ["/admin/emails", "Emails", true],
   ["/admin/allowlist", "Allowlist", true],
   ["/admin/analytics", "Analytics", true],
