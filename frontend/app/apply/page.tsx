@@ -42,6 +42,10 @@ export default function ApplyPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [resume, setResume] = useState<File | null>(null);
+  const [skills, setSkills] = useState<string[]>([]);
+  const [suggested, setSuggested] = useState<string[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const [skillInput, setSkillInput] = useState("");
 
   useEffect(() => {
     fetch(`${API}/api/jobs`)
@@ -58,6 +62,34 @@ export default function ApplyPage() {
   }
 
   const selectedJob = jobs.find((j) => j.id === form.job_id);
+
+  function addSkill(label: string) {
+    const v = label.trim();
+    if (!v) return;
+    setSkills((prev) => (prev.some((x) => x.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]));
+    setSuggested((prev) => prev.filter((x) => x.toLowerCase() !== v.toLowerCase()));
+  }
+
+  async function onResumePicked(file: File | null) {
+    setResume(file);
+    setSuggested([]);
+    if (!file) return;
+    setSuggesting(true);
+    try {
+      const fd = new FormData();
+      fd.append("resume", file);
+      const r = await fetch(`${API}/api/resume/skill-suggest`, { method: "POST", body: fd });
+      if (r.ok) {
+        const data = await r.json();
+        const have = new Set(skills.map((x) => x.toLowerCase()));
+        setSuggested((data.skills as string[]).filter((x) => !have.has(x.toLowerCase())));
+      }
+    } catch {
+      /* suggestions are best-effort */
+    } finally {
+      setSuggesting(false);
+    }
+  }
 
   async function submit() {
     setBusy(true);
@@ -76,6 +108,7 @@ export default function ApplyPage() {
       fd.append("has_ai_study", String(form.has_ai_study));
       if (form.eca) fd.append("eca", form.eca);
       fd.append("consent_talent_bank", String(form.consent_talent_bank));
+      fd.append("skills", JSON.stringify(skills));
       if (form.preferred_start_date) fd.append("preferred_start_date", form.preferred_start_date);
       if (form.salary_expectation) fd.append("salary_expectation", form.salary_expectation);
       if (form.heard_about_us) fd.append("heard_about_us", form.heard_about_us);
@@ -157,10 +190,15 @@ export default function ApplyPage() {
               style={{ ...input, padding: 6 }}
               type="file"
               accept=".pdf,.docx,.txt"
-              onChange={(e) => setResume(e.target.files?.[0] ?? null)}
+              onChange={(e) => onResumePicked(e.target.files?.[0] ?? null)}
             />
             {resume && (
               <p style={{ color: "#059669", fontSize: 13, marginBottom: 0 }}>✓ {resume.name}</p>
+            )}
+            {suggesting && (
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 0 }}>
+                Analyzing resume for skills…
+              </p>
             )}
           </section>
 
@@ -214,6 +252,60 @@ export default function ApplyPage() {
               <input type="checkbox" checked={form.has_ai_study}
                 onChange={(e) => set("has_ai_study", e.target.checked)} /> I have studied AI (courses/projects)
             </label>
+
+            <label style={lbl}>Skills</label>
+            <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
+              Add your skills manually, or pick from the suggestions extracted from your resume.
+            </div>
+            {skills.length > 0 && (
+              <div style={chipRow}>
+                {skills.map((x) => (
+                  <span key={x} style={chipSelected}>
+                    {x}
+                    <button style={chipBtn} onClick={() => setSkills(skills.filter((y) => y !== x))}>
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <input
+                style={{ ...input, marginTop: 0, flex: 1 }}
+                placeholder="e.g. Docker, Public speaking…"
+                value={skillInput}
+                onChange={(e) => setSkillInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    addSkill(skillInput);
+                    setSkillInput("");
+                  }
+                }}
+              />
+              <button
+                style={{ ...primary, padding: "8px 16px" }}
+                onClick={() => {
+                  addSkill(skillInput);
+                  setSkillInput("");
+                }}
+              >
+                Add
+              </button>
+            </div>
+            {suggested.length > 0 && (
+              <>
+                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 12 }}>
+                  Suggested from your resume — click to add:
+                </div>
+                <div style={chipRow}>
+                  {suggested.map((x) => (
+                    <button key={x} style={chipSuggested} onClick={() => addSkill(x)}>
+                      {x} +
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </section>
 
           <section id="additional" style={card}>
@@ -305,4 +397,20 @@ const chk: React.CSSProperties = { display: "block", marginTop: 10 };
 const primary: React.CSSProperties = {
   padding: "10px 22px", border: "none", borderRadius: 8,
   background: "#4338ca", color: "#fff", cursor: "pointer",
+};
+const chipRow: React.CSSProperties = {
+  display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8,
+};
+const chipSelected: React.CSSProperties = {
+  display: "inline-flex", alignItems: "center", gap: 4,
+  background: "#eef2ff", color: "#4338ca", fontWeight: 600,
+  borderRadius: 999, padding: "4px 6px 4px 12px", fontSize: 13,
+};
+const chipBtn: React.CSSProperties = {
+  border: "none", background: "transparent", color: "#4338ca",
+  fontSize: 15, lineHeight: 1, padding: "0 6px", cursor: "pointer",
+};
+const chipSuggested: React.CSSProperties = {
+  background: "#fff", color: "#374151", border: "1px dashed #9ca3af",
+  borderRadius: 999, padding: "4px 12px", fontSize: 13, cursor: "pointer",
 };

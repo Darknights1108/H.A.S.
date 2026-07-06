@@ -23,7 +23,8 @@ from ..auth import get_session, require_admin
 from ..config import settings
 from ..database import get_db
 from ..models import Application, Candidate, Interview, Job, Score, Slot, UserSession
-from ..services.resume import ALLOWED_EXTS, MAX_SIZE, parse_resume_async
+from ..services import llm
+from ..services.resume import ALLOWED_EXTS, MAX_SIZE, extract_text, parse_resume_async
 from ..services.scheduling import draft_email
 from ..services.scoring import score_application
 from ..services.storage import CONTENT_TYPES, get_resume, put_resume
@@ -36,6 +37,52 @@ router = APIRouter(tags=["applications"])
 def list_jobs(db: Session = Depends(get_db)) -> list[dict]:
     jobs = db.scalars(select(Job).where(Job.is_open).order_by(Job.created_at)).all()
     return [{"id": str(j.id), "title": j.title, "description": j.description} for j in jobs]
+
+
+# ---------- resume skill suggestion(提交前调用,从简历提取技能 chips)----------
+
+@router.post("/resume/skill-suggest")
+def suggest_skills(resume: UploadFile = File(...)) -> dict:
+    """从上传的简历即时提取技能列表,供申请表 Skills 区显示建议 chips。"""
+    if llm.provider() is None:
+        raise HTTPException(503, "skill suggestion unavailable (no LLM key)")
+    if not resume.filename or "." not in resume.filename:
+        raise HTTPException(422, "invalid file")
+    ext = "." + resume.filename.rsplit(".", 1)[-1].lower()
+    if ext not in ALLOWED_EXTS:
+        raise HTTPException(422, f"resume must be one of {sorted(ALLOWED_EXTS)}")
+    data = resume.file.read()
+    if len(data) > MAX_SIZE:
+        raise HTTPException(422, "resume too large (max 5MB)")
+    try:
+        text = extract_text(data, ext)
+        parsed, model = llm.tool_call(
+            prompt=(
+                "Extract ALL skills from this resume: technical skills, tools, "
+                "frameworks, languages (programming and spoken), and soft skills. "
+                "Short labels (1-3 words each), no duplicates.\n\n--- RESUME ---\n" + text
+            ),
+            tool_name="submit_skills",
+            description="Submit the list of skills found in the resume.",
+            schema={
+                "type": "object",
+                "properties": {"skills": {"type": "array", "items": {"type": "string"}}},
+                "required": ["skills"],
+            },
+            max_tokens=600,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"skill extraction failed: {e}") from e
+    seen: set[str] = set()
+    skills: list[str] = []
+    for x in parsed.get("skills", []):
+        label = str(x).strip()
+        if label and len(label) <= 40 and label.lower() not in seen:
+            seen.add(label.lower())
+            skills.append(label)
+    return {"skills": skills[:30], "model": model}
 
 
 # ---------- public submission(multipart:表单字段 + 可选简历文件)----------
@@ -72,6 +119,7 @@ def submit_application(
     eca: str | None = Form(None),
     consent_talent_bank: bool = Form(False),
     # 可选补充信息(仅存 form_data,不参与打分)
+    skills: str = Form("[]"),               # JSON array string
     preferred_start_date: str | None = Form(None),
     salary_expectation: str | None = Form(None),
     heard_about_us: str | None = Form(None),
@@ -84,6 +132,12 @@ def submit_application(
         langs = [str(x) for x in langs]
     except (ValueError, AssertionError):
         raise HTTPException(422, "prog_langs must be a JSON array of strings")
+    try:
+        skill_list = json.loads(skills)
+        assert isinstance(skill_list, list)
+        skill_list = [str(x).strip()[:40] for x in skill_list if str(x).strip()][:30]
+    except (ValueError, AssertionError):
+        raise HTTPException(422, "skills must be a JSON array of strings")
 
     payload = ApplicationIn(
         job_id=job_id, name=name, email=email, phone=phone or None, cgpa=cgpa,
@@ -140,6 +194,7 @@ def submit_application(
         eca=payload.eca,
         form_data={
             **payload.model_dump(mode="json"),
+            "skills": skill_list,
             "preferred_start_date": preferred_start_date,
             "salary_expectation": salary_expectation,
             "heard_about_us": heard_about_us,
@@ -212,6 +267,7 @@ def list_applications(db: Session = Depends(get_db),
             "band": s.band if s else None,
             "total_score": float(s.total_score) if s and s.total_score is not None else None,
             "reasoning": s.reasoning if s else None,
+            "skills": (a.form_data or {}).get("skills") or [],
             "booking_url": f"{settings.frontend_base_url}/booking/{a.booking_token}",
             "submitted_at": a.submitted_at.isoformat(),
             "resume": {
