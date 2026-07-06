@@ -4,10 +4,20 @@ import { useEffect, useState } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-type JobOpt = { id: string; title: string };
+type JobOpt = { id: string; title: string; description: string | null };
 
 const DEGREE_FIELDS = ["CS", "SE", "IS", "IT", "Data Science", "Other"];
 const LANGS = ["Python", "PHP", "Java", "JavaScript", "C++", "Go"];
+const SOURCES = ["LinkedIn", "JobStreet", "University / Career fair", "Friend or referral", "Company website", "Other"];
+
+const SECTIONS: [string, string][] = [
+  ["position", "Position"],
+  ["resume", "Resume"],
+  ["contact", "Contact Information"],
+  ["academic", "Academic & Skills"],
+  ["additional", "Additional Information"],
+  ["consent", "Consent & Submit"],
+];
 
 export default function ApplyPage() {
   const [jobs, setJobs] = useState<JobOpt[]>([]);
@@ -24,6 +34,9 @@ export default function ApplyPage() {
     has_ai_study: false,
     eca: "",
     consent_talent_bank: false,
+    preferred_start_date: "",
+    salary_expectation: "",
+    heard_about_us: "",
   });
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +57,8 @@ export default function ApplyPage() {
     setForm((f) => ({ ...f, [key]: value }));
   }
 
+  const selectedJob = jobs.find((j) => j.id === form.job_id);
+
   async function submit() {
     setBusy(true);
     setError(null);
@@ -61,6 +76,9 @@ export default function ApplyPage() {
       fd.append("has_ai_study", String(form.has_ai_study));
       if (form.eca) fd.append("eca", form.eca);
       fd.append("consent_talent_bank", String(form.consent_talent_bank));
+      if (form.preferred_start_date) fd.append("preferred_start_date", form.preferred_start_date);
+      if (form.salary_expectation) fd.append("salary_expectation", form.salary_expectation);
+      if (form.heard_about_us) fd.append("heard_about_us", form.heard_about_us);
       if (resume) fd.append("resume", resume);
 
       const r = await fetch(`${API}/api/applications`, { method: "POST", body: fd });
@@ -72,6 +90,7 @@ export default function ApplyPage() {
         throw new Error(detail ?? `HTTP ${r.status}`);
       }
       setResult(data.message);
+      window.scrollTo({ top: 0 });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -81,7 +100,7 @@ export default function ApplyPage() {
 
   if (result) {
     return (
-      <main style={wrap}>
+      <main style={{ maxWidth: 560, margin: "12vh auto 0", textAlign: "center" }}>
         <h1>Thank you!</h1>
         <p>{result}</p>
       </main>
@@ -89,101 +108,194 @@ export default function ApplyPage() {
   }
 
   return (
-    <main style={wrap}>
-      <h1>Job application</h1>
+    <main style={{ maxWidth: 980, margin: "0 auto" }}>
+      <h1>Application for</h1>
+      <div style={jobHeader}>
+        <span style={jobIcon}>💼</span>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 17 }}>
+            {selectedJob?.title ?? "—"}
+          </div>
+          <div style={{ color: "#6b7280", fontSize: 13 }}>Online interview · MYT (UTC+08:00)</div>
+        </div>
+      </div>
+      <p style={{ color: "#6b7280", fontSize: 13 }}>
+        Required fields are indicated with <span style={{ color: "#dc2626" }}>*</span>
+      </p>
       {error && <p style={{ color: "#dc2626" }}>{error}</p>}
 
-      <label style={lbl}>Position</label>
-      <select style={input} value={form.job_id} onChange={(e) => set("job_id", e.target.value)}>
-        {jobs.map((j) => (
-          <option key={j.id} value={j.id}>{j.title}</option>
-        ))}
-      </select>
+      <div style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
+        {/* left step nav */}
+        <nav style={sideNav}>
+          {SECTIONS.map(([id, label]) => (
+            <a key={id} href={`#${id}`} style={navItem}>
+              <span style={navDot} />
+              {label}
+            </a>
+          ))}
+        </nav>
 
-      <label style={lbl}>Full name *</label>
-      <input style={input} value={form.name} onChange={(e) => set("name", e.target.value)} />
+        {/* form sections */}
+        <div style={{ flex: 1, minWidth: 320 }}>
+          <section id="position" style={card}>
+            <h2 style={h2}>Position</h2>
+            <label style={lbl}>Select the position you want to apply for <Req /></label>
+            <select style={input} value={form.job_id} onChange={(e) => set("job_id", e.target.value)}>
+              {jobs.map((j) => (
+                <option key={j.id} value={j.id}>{j.title}</option>
+              ))}
+            </select>
+            {selectedJob?.description && (
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 0 }}>{selectedJob.description}</p>
+            )}
+          </section>
 
-      <label style={lbl}>Email *</label>
-      <input style={input} type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
-
-      <label style={lbl}>Phone</label>
-      <input style={input} value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-
-      <label style={lbl}>CGPA (0.00 – 4.00) *</label>
-      <input style={input} type="number" step="0.01" min="0" max="4" value={form.cgpa}
-        onChange={(e) => set("cgpa", e.target.value)} />
-
-      <label style={lbl}>Degree field *</label>
-      <select style={input} value={form.degree_field} onChange={(e) => set("degree_field", e.target.value)}>
-        {DEGREE_FIELDS.map((d) => <option key={d}>{d}</option>)}
-      </select>
-
-      <label style={chk}>
-        <input type="checkbox" checked={form.is_fulltime}
-          onChange={(e) => set("is_fulltime", e.target.checked)} /> Full-time student
-      </label>
-
-      <label style={lbl}>Programming languages</label>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        {LANGS.map((l) => (
-          <label key={l} style={chk}>
+          <section id="resume" style={card}>
+            <h2 style={h2}>Resume</h2>
+            <label style={lbl}>Upload your resume (PDF / DOCX / TXT, max 5MB)</label>
             <input
-              type="checkbox"
-              checked={form.prog_langs.includes(l)}
-              onChange={(e) =>
-                set(
-                  "prog_langs",
-                  e.target.checked
-                    ? [...form.prog_langs, l]
-                    : form.prog_langs.filter((x) => x !== l)
-                )
-              }
-            /> {l}
-          </label>
-        ))}
+              style={{ ...input, padding: 6 }}
+              type="file"
+              accept=".pdf,.docx,.txt"
+              onChange={(e) => setResume(e.target.files?.[0] ?? null)}
+            />
+            {resume && (
+              <p style={{ color: "#059669", fontSize: 13, marginBottom: 0 }}>✓ {resume.name}</p>
+            )}
+          </section>
+
+          <section id="contact" style={card}>
+            <h2 style={h2}>Contact Information</h2>
+            <label style={lbl}>Full name <Req /></label>
+            <input style={input} value={form.name} onChange={(e) => set("name", e.target.value)} />
+            <label style={lbl}>Email <Req /></label>
+            <input style={input} type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+            <label style={lbl}>Phone</label>
+            <input style={input} placeholder="+60…" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+          </section>
+
+          <section id="academic" style={card}>
+            <h2 style={h2}>Academic & Skills</h2>
+            <label style={lbl}>CGPA (0.00 – 4.00) <Req /></label>
+            <input style={input} type="number" step="0.01" min="0" max="4" value={form.cgpa}
+              onChange={(e) => set("cgpa", e.target.value)} />
+            <label style={lbl}>Degree field <Req /></label>
+            <select style={input} value={form.degree_field} onChange={(e) => set("degree_field", e.target.value)}>
+              {DEGREE_FIELDS.map((d) => <option key={d}>{d}</option>)}
+            </select>
+            <label style={chk}>
+              <input type="checkbox" checked={form.is_fulltime}
+                onChange={(e) => set("is_fulltime", e.target.checked)} /> Full-time student
+            </label>
+            <label style={lbl}>Programming languages</label>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {LANGS.map((l) => (
+                <label key={l} style={chk}>
+                  <input
+                    type="checkbox"
+                    checked={form.prog_langs.includes(l)}
+                    onChange={(e) =>
+                      set(
+                        "prog_langs",
+                        e.target.checked
+                          ? [...form.prog_langs, l]
+                          : form.prog_langs.filter((x) => x !== l)
+                      )
+                    }
+                  /> {l}
+                </label>
+              ))}
+            </div>
+            <label style={chk}>
+              <input type="checkbox" checked={form.has_sql}
+                onChange={(e) => set("has_sql", e.target.checked)} /> I know SQL
+            </label>
+            <label style={chk}>
+              <input type="checkbox" checked={form.has_ai_study}
+                onChange={(e) => set("has_ai_study", e.target.checked)} /> I have studied AI (courses/projects)
+            </label>
+          </section>
+
+          <section id="additional" style={card}>
+            <h2 style={h2}>Additional Information</h2>
+            <label style={lbl}>Extra-curricular activities</label>
+            <textarea style={{ ...input, height: 80 }} value={form.eca}
+              onChange={(e) => set("eca", e.target.value)} />
+            <label style={lbl}>Preferred start date</label>
+            <input style={input} type="date" value={form.preferred_start_date}
+              onChange={(e) => set("preferred_start_date", e.target.value)} />
+            <label style={lbl}>Salary / allowance expectation (RM per month)</label>
+            <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
+              This field is not mandatory, but helps us understand your expectation.
+            </div>
+            <input style={input} type="number" min="0" value={form.salary_expectation}
+              onChange={(e) => set("salary_expectation", e.target.value)} />
+            <label style={lbl}>How did you hear about us?</label>
+            <select style={input} value={form.heard_about_us}
+              onChange={(e) => set("heard_about_us", e.target.value)}>
+              <option value="">Select…</option>
+              {SOURCES.map((x) => <option key={x}>{x}</option>)}
+            </select>
+          </section>
+
+          <section id="consent" style={card}>
+            <h2 style={h2}>Consent & Submit</h2>
+            <label style={chk}>
+              <input type="checkbox" checked={form.consent_talent_bank}
+                onChange={(e) => set("consent_talent_bank", e.target.checked)} />{" "}
+              I consent to my data being kept in the talent bank for future opportunities
+            </label>
+            <p style={{ color: "#6b7280", fontSize: 12 }}>
+              By pressing Submit you confirm the information provided is accurate.
+              Your data is processed for recruitment purposes only.
+            </p>
+            <button
+              style={primary}
+              disabled={busy || !form.job_id || !form.name || !form.email || !form.cgpa}
+              onClick={submit}
+            >
+              {busy ? "Submitting…" : "Submit application"}
+            </button>
+          </section>
+        </div>
       </div>
-
-      <label style={chk}>
-        <input type="checkbox" checked={form.has_sql}
-          onChange={(e) => set("has_sql", e.target.checked)} /> I know SQL
-      </label>
-      <label style={chk}>
-        <input type="checkbox" checked={form.has_ai_study}
-          onChange={(e) => set("has_ai_study", e.target.checked)} /> I have studied AI (courses/projects)
-      </label>
-
-      <label style={lbl}>Resume (PDF / DOCX / TXT, max 5MB)</label>
-      <input
-        style={{ ...input, padding: "6px" }}
-        type="file"
-        accept=".pdf,.docx,.txt"
-        onChange={(e) => setResume(e.target.files?.[0] ?? null)}
-      />
-
-      <label style={lbl}>Extra-curricular activities</label>
-      <textarea style={{ ...input, height: 80 }} value={form.eca}
-        onChange={(e) => set("eca", e.target.value)} />
-
-      <label style={chk}>
-        <input type="checkbox" checked={form.consent_talent_bank}
-          onChange={(e) => set("consent_talent_bank", e.target.checked)} />{" "}
-        I consent to my data being kept in the talent bank for future opportunities
-      </label>
-
-      <p>
-        <button
-          style={primary}
-          disabled={busy || !form.job_id || !form.name || !form.email || !form.cgpa}
-          onClick={submit}
-        >
-          {busy ? "Submitting…" : "Submit application"}
-        </button>
-      </p>
     </main>
   );
 }
 
-const wrap: React.CSSProperties = { maxWidth: 560, margin: "0 auto" };
+function Req() {
+  return <span style={{ color: "#dc2626" }}>*</span>;
+}
+
+const jobHeader: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 12,
+  background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
+  boxShadow: "0 1px 3px rgba(16,24,40,0.06)", padding: "12px 16px", margin: "8px 0 4px",
+};
+const jobIcon: React.CSSProperties = {
+  width: 42, height: 42, borderRadius: "50%", background: "#eef2ff",
+  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+};
+const sideNav: React.CSSProperties = {
+  position: "sticky", top: 24, minWidth: 190,
+  display: "flex", flexDirection: "column", gap: 18, paddingTop: 8,
+};
+const navItem: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 10,
+  color: "#374151", textDecoration: "none", fontSize: 13.5,
+};
+const navDot: React.CSSProperties = {
+  width: 12, height: 12, borderRadius: "50%", flexShrink: 0,
+  border: "2px solid #059669", background: "#fff",
+};
+const card: React.CSSProperties = {
+  background: "#fff", boxShadow: "0 1px 3px rgba(16,24,40,0.06)",
+  border: "1px solid #e5e7eb", borderRadius: 12,
+  padding: "14px 20px 18px", margin: "0 0 16px", scrollMarginTop: 20,
+};
+const h2: React.CSSProperties = {
+  marginTop: 0, paddingBottom: 8, borderBottom: "1px solid #f1f3f5",
+};
 const lbl: React.CSSProperties = { display: "block", marginTop: 14, fontWeight: 600 };
 const input: React.CSSProperties = {
   display: "block", width: "100%", padding: "8px 10px", marginTop: 4,

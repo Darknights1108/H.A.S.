@@ -71,6 +71,10 @@ def submit_application(
     has_ai_study: bool = Form(False),
     eca: str | None = Form(None),
     consent_talent_bank: bool = Form(False),
+    # 可选补充信息(仅存 form_data,不参与打分)
+    preferred_start_date: str | None = Form(None),
+    salary_expectation: str | None = Form(None),
+    heard_about_us: str | None = Form(None),
     resume: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -134,7 +138,12 @@ def submit_application(
         has_sql=payload.has_sql,
         has_ai_study=payload.has_ai_study,
         eca=payload.eca,
-        form_data=payload.model_dump(mode="json"),
+        form_data={
+            **payload.model_dump(mode="json"),
+            "preferred_start_date": preferred_start_date,
+            "salary_expectation": salary_expectation,
+            "heard_about_us": heard_about_us,
+        },
         status="applied",
     )
     db.add(app_)
