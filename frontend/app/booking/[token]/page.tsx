@@ -22,7 +22,7 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-/** 本月月历(固定,不可翻月):工作日且有空档才可选 */
+/** Current-month calendar (fixed, no navigation): weekdays with open slots only */
 function MonthCalendar({
   openDates,
   activeDate,
@@ -143,7 +143,7 @@ export default function BookingPage() {
       });
       const data = await r.json();
       if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
-      else if (path === "reschedule") setShowReschedule(false); // 改期成功后收起日历
+      else if (path === "reschedule") setShowReschedule(false); // collapse calendar after a successful reschedule
       await load();
     } catch (e) {
       setNotice(String(e));

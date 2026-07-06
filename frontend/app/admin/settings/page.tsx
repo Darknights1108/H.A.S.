@@ -30,6 +30,24 @@ const PLACEHOLDER_HINT =
   "Placeholders: {candidate_name} · {job_title} · {booking_url} · {company_name}";
 const TEMPLATE_KEYS = new Set(["invite_email_subject", "invite_email_template"]);
 
+// 展示顺序:流程配置 → 时段配置 → 信件配置
+const ORDER = [
+  "shortlist_review_days",
+  "candidate_response_days",
+  "slot_duration_minutes",
+  "work_start_hour",
+  "work_end_hour",
+  "panel_max_interviewers",
+  "reschedule_max",
+  "company_name",
+  "invite_email_subject",
+  "invite_email_template",
+];
+const orderOf = (k: string) => {
+  const i = ORDER.indexOf(k);
+  return i === -1 ? 99 : i;
+};
+
 export default function AdminSettingsPage() {
   const { session, loading } = useSession(true);
   const [rows, setRows] = useState<Setting[]>([]);
@@ -41,6 +59,7 @@ export default function AdminSettingsPage() {
     const r = await fetch(`${API}/api/settings`);
     if (r.ok) {
       const data: Setting[] = await r.json();
+      data.sort((a, b) => orderOf(a.key) - orderOf(b.key));
       setRows(data);
       setDrafts(Object.fromEntries(data.map((s) => [s.key, String(s.value)])));
     }

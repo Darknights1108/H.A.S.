@@ -48,7 +48,7 @@ export default function AllowlistPage() {
       <AdminBar session={session} />
       <h1>Allowed emails</h1>
       <p style={{ color: "#6b7280" }}>
-        只有名单内且 enabled 的邮箱才能收到登录链接。禁用/移除会立即吊销该邮箱的会话。
+        Only enabled emails on this list can receive a login link. Disabling or removing an entry revokes its sessions immediately.
       </p>
       {notice && <p style={{ color: "#dc2626" }}>{notice}</p>}
 

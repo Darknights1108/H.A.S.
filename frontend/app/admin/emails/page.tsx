@@ -41,7 +41,7 @@ export default function AdminEmailsPage() {
       const r = await fetch(`${API}/api/emails/${id}/send`, { method: "POST" });
       const data = await r.json();
       if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
-      else setNotice("已发送 ✅");
+      else setNotice("Sent ✅");
       await load();
     } finally {
       setBusy(null);
@@ -56,8 +56,7 @@ export default function AdminEmailsPage() {
       <h1>Email outbox</h1>
       {!smtpConfigured && (
         <p style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px" }}>
-          ⚠ SMTP 未配置 — 在根目录 .env 填 SMTP_HOST / SMTP_USER / SMTP_PASSWORD
-          后重启 backend,才能真实发送。
+          ⚠ SMTP not configured — set SMTP_HOST / SMTP_USER / SMTP_PASSWORD in the root .env and restart the backend to enable real sending.
         </p>
       )}
       {notice && <p style={{ color: notice.includes("✅") ? "#059669" : "#dc2626" }}>{notice}</p>}
@@ -86,7 +85,7 @@ export default function AdminEmailsPage() {
                     <span style={{ color: "#b45309" }}>draft</span>
                   )}
                   {e.sent_at && (
-                    <div style={{ color: "#6b7280", fontSize: 11 }}>{e.sent_at.slice(0, 16)}</div>
+                    <div style={{ color: "#6b7280", fontSize: 11 }}>{e.sent_at.slice(0, 16).replace("T", " ")}</div>
                   )}
                 </td>
                 <td style={td}>

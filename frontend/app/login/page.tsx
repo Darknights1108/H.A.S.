@@ -20,7 +20,7 @@ export default function LoginPage() {
       });
       const data = await r.json().catch(() => ({}));
       setSent(true);
-      if (data.debug_link) setDebugLink(data.debug_link); // 仅开发模式出现
+      if (data.debug_link) setDebugLink(data.debug_link); // dev mode only
     } finally {
       setBusy(false);
     }

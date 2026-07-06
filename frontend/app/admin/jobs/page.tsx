@@ -107,7 +107,7 @@ export default function AdminJobsPage() {
       const data = await r.json();
       if (!r.ok) {
         setNotice(data.detail ?? `HTTP ${r.status}`);
-        setShowForm(true); // 降级:无 key 时直接开手动表单
+        setShowForm(true); // fallback: open the manual form when no LLM key
         return;
       }
       const ko = data.requirements.knockout ?? {};
@@ -127,7 +127,7 @@ export default function AdminJobsPage() {
       });
       setUnmapped(data.unmapped ?? []);
       setShowForm(true);
-      setNotice(`AI 解析完成(${data.model})— 请检查下方规则,可修改后创建`);
+      setNotice(`AI parsing done (${data.model}) — review the rules below, edit if needed, then create`);
     } catch (e) {
       setNotice(String(e));
     } finally {
@@ -169,7 +169,7 @@ export default function AdminJobsPage() {
           });
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail ?? `HTTP ${r.status}`);
-      setNotice(editingId ? `已保存修改:${data.title}(对之后的新申请生效)` : `职位已创建:${data.title}`);
+      setNotice(editingId ? `Saved: ${data.title} (applies to future applications)` : `Job created: ${data.title}`);
       setDraft(emptyDraft);
       setJdText("");
       setShowForm(false);
@@ -189,7 +189,7 @@ export default function AdminJobsPage() {
     const r = await fetch(`${API}/api/jobs/${id}`, { method: "DELETE" });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
-    else setNotice("职位已删除");
+    else setNotice("Job deleted");
     await load();
   }
 
@@ -213,7 +213,7 @@ export default function AdminJobsPage() {
         <h2 style={{ marginTop: 0 }}>New job — paste the JD</h2>
         <textarea
           style={{ ...input, height: 160, fontFamily: "inherit" }}
-          placeholder="把职位描述(JD)原文贴在这里,AI 会解析出筛选规则……"
+          placeholder="Paste the raw job description (JD) here — AI will extract the screening rules…"
           value={jdText}
           onChange={(e) => setJdText(e.target.value)}
         />
@@ -225,10 +225,10 @@ export default function AdminJobsPage() {
             Fill rules manually
           </button>
         </p>
-        {notice && <p style={{ color: notice.includes("失败") || notice.includes("HTTP") || notice.includes("not configured") ? "#dc2626" : "#2563eb" }}>{notice}</p>}
+        {notice && <p style={{ color: notice.includes("failed") || notice.includes("HTTP") || notice.includes("not configured") ? "#dc2626" : "#2563eb" }}>{notice}</p>}
         {unmapped.length > 0 && (
           <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px" }}>
-            <b>无法映射到表单的要求(需人工留意):</b>
+            <b>Requirements that could not be mapped to the form (needs human attention):</b>
             <ul style={{ margin: "4px 0" }}>
               {unmapped.map((u, i) => <li key={i}>{u}</li>)}
             </ul>
@@ -238,38 +238,38 @@ export default function AdminJobsPage() {
 
       {showForm && (
         <section style={card}>
-          <h2 style={{ marginTop: 0 }}>{editingId ? "Edit screening rules" : "Screening rules(可修改)"}</h2>
+          <h2 style={{ marginTop: 0 }}>{editingId ? "Edit screening rules" : "Screening rules (editable)"}</h2>
           <label style={lbl}>Title *</label>
           <input style={input} value={draft.title} onChange={(e) => set("title", e.target.value)} />
           <label style={lbl}>Description</label>
           <textarea style={{ ...input, height: 60 }} value={draft.description}
             onChange={(e) => set("description", e.target.value)} />
 
-          <h3>Knockout(硬门槛,留空 = 不检查该项)</h3>
+          <h3>Knockout — hard requirements (leave blank to skip a check)</h3>
           <label style={lbl}>Min CGPA</label>
           <input style={input} type="number" step="0.01" value={draft.min_cgpa}
             onChange={(e) => set("min_cgpa", e.target.value)} />
-          <label style={lbl}>Accepted degree fields(逗号分隔,如 CS, SE, IT)</label>
+          <label style={lbl}>Accepted degree fields (comma-separated, e.g. CS, SE, IT)</label>
           <input style={input} value={draft.fields} onChange={(e) => set("fields", e.target.value)} />
           <label style={chk}>
             <input type="checkbox" checked={draft.require_fulltime}
               onChange={(e) => set("require_fulltime", e.target.checked)} /> Require full-time student
           </label>
-          <label style={lbl}>Required languages — any of(逗号分隔,如 Python, PHP)</label>
+          <label style={lbl}>Required languages — any of (comma-separated, e.g. Python, PHP)</label>
           <input style={input} value={draft.langs_any} onChange={(e) => set("langs_any", e.target.value)} />
           <label style={chk}>
             <input type="checkbox" checked={draft.require_sql}
               onChange={(e) => set("require_sql", e.target.checked)} /> Require SQL
           </label>
 
-          <h3>Bonus(加分,留空 = 不加分)</h3>
+          <h3>Bonus points (leave blank for none)</h3>
           <label style={lbl}>AI study points</label>
           <input style={input} type="number" value={draft.ai_study} onChange={(e) => set("ai_study", e.target.value)} />
           <label style={lbl}>Extra-curricular points</label>
           <input style={input} type="number" value={draft.eca} onChange={(e) => set("eca", e.target.value)} />
           <label style={lbl}>Extra language points</label>
           <input style={input} type="number" value={draft.extra_lang} onChange={(e) => set("extra_lang", e.target.value)} />
-          <label style={lbl}>High band threshold(bonus ≥ 此值 → High)</label>
+          <label style={lbl}>High band threshold (bonus ≥ this → High)</label>
           <input style={input} type="number" value={draft.high_min_bonus}
             onChange={(e) => set("high_min_bonus", e.target.value)} />
 
@@ -296,7 +296,7 @@ export default function AdminJobsPage() {
             </span>{" "}
             <span style={{ color: "#6b7280", fontSize: 12 }}>{j.application_count} application(s)</span>{" "}
             <button style={btnSm} onClick={() => setExpandedJob(expandedJob === j.id ? null : j.id)}>
-              {expandedJob === j.id ? "收起条件" : "展开条件"}
+              {expandedJob === j.id ? "Hide rules" : "View rules"}
             </button>{" "}
             <button style={btnSm} onClick={() => startEdit(j)}>Edit</button>{" "}
             <button style={btnSm} onClick={() => toggleOpen(j)}>
@@ -304,9 +304,9 @@ export default function AdminJobsPage() {
             </button>{" "}
             {deleteConfirm === j.id ? (
               <span style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "3px 8px", fontSize: 12 }}>
-                确认删除「{j.title}」?{" "}
-                <button style={{ ...btnSm, background: "#dc2626" }} onClick={() => deleteJob(j.id)}>删除</button>{" "}
-                <button style={{ ...btnSm, background: "#6b7280" }} onClick={() => setDeleteConfirm(null)}>取消</button>
+                Delete “{j.title}”?{" "}
+                <button style={{ ...btnSm, background: "#dc2626" }} onClick={() => deleteJob(j.id)}>Delete</button>{" "}
+                <button style={{ ...btnSm, background: "#6b7280" }} onClick={() => setDeleteConfirm(null)}>Cancel</button>
               </span>
             ) : (
               <button style={{ ...btnSm, background: "#dc2626" }} onClick={() => setDeleteConfirm(j.id)}>
@@ -327,23 +327,23 @@ function RulesView({ req }: { req: Requirements }) {
   const li: React.CSSProperties = { margin: "2px 0" };
   return (
     <div style={{ background: "#f9fafb", border: "1px solid #f1f3f5", borderRadius: 8, padding: "8px 14px", marginTop: 8, fontSize: 13 }}>
-      <b>硬门槛(任一不满足 → Low)</b>
+      <b>Knockout — fail any → Low</b>
       <ul style={{ margin: "4px 0 10px" }}>
         {ko.min_cgpa != null && <li style={li}>CGPA ≥ {ko.min_cgpa}</li>}
-        {(ko.fields?.length ?? 0) > 0 && <li style={li}>专业属于:{ko.fields!.join(" / ")}</li>}
-        {ko.require_fulltime && <li style={li}>必须是全日制学生</li>}
-        {(ko.langs_any?.length ?? 0) > 0 && <li style={li}>会编程语言(任一):{ko.langs_any!.join(" / ")}</li>}
-        {ko.require_sql && <li style={li}>必须会 SQL</li>}
+        {(ko.fields?.length ?? 0) > 0 && <li style={li}>Degree field in: {ko.fields!.join(" / ")}</li>}
+        {ko.require_fulltime && <li style={li}>Must be a full-time student</li>}
+        {(ko.langs_any?.length ?? 0) > 0 && <li style={li}>Programming language (any of): {ko.langs_any!.join(" / ")}</li>}
+        {ko.require_sql && <li style={li}>SQL knowledge required</li>}
         {ko.min_cgpa == null && !(ko.fields?.length) && !ko.require_fulltime && !(ko.langs_any?.length) && !ko.require_sql && (
-          <li style={li}>(无硬门槛)</li>
+          <li style={li}>(no hard requirements)</li>
         )}
       </ul>
-      <b>加分项(总分 ≥ {req.high_min_bonus ?? 15} → High,否则 Medium)</b>
+      <b>Bonus — total ≥ {req.high_min_bonus ?? 15} → High, otherwise Medium</b>
       <ul style={{ margin: "4px 0 0" }}>
-        {bo.ai_study != null && <li style={li}>AI 学习/项目 +{bo.ai_study}</li>}
-        {bo.eca != null && <li style={li}>课外活动 +{bo.eca}</li>}
-        {bo.extra_lang != null && <li style={li}>多种编程语言 +{bo.extra_lang}</li>}
-        {bo.ai_study == null && bo.eca == null && bo.extra_lang == null && <li style={li}>(无加分项)</li>}
+        {bo.ai_study != null && <li style={li}>AI study/projects +{bo.ai_study}</li>}
+        {bo.eca != null && <li style={li}>Extra-curricular +{bo.eca}</li>}
+        {bo.extra_lang != null && <li style={li}>Multiple languages +{bo.extra_lang}</li>}
+        {bo.ai_study == null && bo.eca == null && bo.extra_lang == null && <li style={li}>(no bonus points)</li>}
       </ul>
     </div>
   );

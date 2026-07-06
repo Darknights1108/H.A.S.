@@ -152,7 +152,7 @@ export default function ApplyPage() {
           onChange={(e) => set("has_ai_study", e.target.checked)} /> I have studied AI (courses/projects)
       </label>
 
-      <label style={lbl}>Resume(PDF / DOCX / TXT,≤5MB)</label>
+      <label style={lbl}>Resume (PDF / DOCX / TXT, max 5MB)</label>
       <input
         style={{ ...input, padding: "6px" }}
         type="file"
