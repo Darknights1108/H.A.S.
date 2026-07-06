@@ -21,7 +21,12 @@ frontend/     Next.js admin dashboard
 docker-compose.yml
 ```
 
-## 一键起栈(Docker)
+## 一键起栈
+
+**Windows:双击 `start-has.bat`** —— 自动启动 Docker Desktop(如未运行)→ 起容器 → 等服务就绪 → 打开浏览器。
+停止用 `stop-has.bat`(数据保留);改了代码用 `start-has.bat build` 重建镜像。
+
+或手动:
 
 ```bash
 docker compose up --build
