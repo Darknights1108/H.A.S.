@@ -11,7 +11,7 @@ import threading
 import uuid
 
 from ..database import SessionLocal
-from ..models import Application
+from ..models import Application, Job
 from . import llm
 from .storage import get_resume
 
@@ -58,6 +58,35 @@ EXTRACT_TOOL = {
                 "description": "Compare the resume against the application form claims: "
                                "note CONFIRMED claims and any MISMATCH/NOT-FOUND items "
                                "(CGPA, degree field, languages, SQL, AI study).",
+            },
+            "jd_match": {
+                "type": "object",
+                "description": "Evaluation of the resume against the JOB SCREENING PROFILE "
+                               "(only when one is provided in the prompt).",
+                "properties": {
+                    "must_have": {
+                        "type": "array",
+                        "items": {"type": "object", "properties": {
+                            "criterion": {"type": "string"},
+                            "met": {"type": "string", "enum": ["yes", "partial", "no", "unknown"]},
+                            "evidence": {"type": "string",
+                                         "description": "Short quote/paraphrase from the resume, "
+                                                        "or why it is not met"},
+                        }, "required": ["criterion", "met", "evidence"]},
+                    },
+                    "nice_to_have": {
+                        "type": "array",
+                        "items": {"type": "object", "properties": {
+                            "criterion": {"type": "string"},
+                            "met": {"type": "string", "enum": ["yes", "partial", "no", "unknown"]},
+                            "evidence": {"type": "string"},
+                        }, "required": ["criterion", "met", "evidence"]},
+                    },
+                    "match_score": {"type": "number",
+                                    "description": "0-100 overall fit against the profile"},
+                    "verdict": {"type": "string",
+                                "description": "2-3 sentence hiring-fit summary"},
+                },
             },
         },
         "required": ["summary", "education", "experience_projects",
@@ -108,19 +137,35 @@ def _parse(application_id: uuid.UUID) -> None:
             ext = "." + app_.resume_file_url.rsplit(".", 1)[-1].lower()
             data = get_resume(app_.resume_file_url)
             text = extract_text(data, ext)
+            job = db.get(Job, app_.job_id)
+            criteria = ((job.requirements or {}).get("criteria") or {}) if job else {}
+            profile_block = ""
+            if criteria.get("must_have") or criteria.get("nice_to_have"):
+                mh = "".join(f"- {x}\n" for x in criteria.get("must_have", []))
+                nh = "".join(f"- {x}\n" for x in criteria.get("nice_to_have", []))
+                profile_block = (
+                    "JOB SCREENING PROFILE (evaluate the resume against EVERY item "
+                    "below in jd_match, with met=yes/partial/no/unknown and concrete "
+                    "evidence; then give match_score 0-100 and a verdict):\n"
+                    f"Role summary: {criteria.get('summary', '')}\n"
+                    f"MUST HAVE:\n{mh}NICE TO HAVE:\n{nh}\n"
+                )
             parsed, model = llm.tool_call(
                 prompt=(
-                    "Analyze this resume for an internship screening system.\n\n"
+                    "Analyze this resume for a hiring screening system.\n\n"
+                    f"{profile_block}"
                     "The candidate ALSO filled an application form claiming:\n"
                     f"{_form_claims(app_)}\n\n"
                     "Cross-check the resume against these claims in "
                     "consistency_notes (mark CONFIRMED / MISMATCH / NOT FOUND per "
-                    "claim, with evidence).\n\n--- RESUME ---\n" + text
+                    "claim, with evidence)."
+                    + ("" if profile_block else " Omit jd_match — no profile provided.")
+                    + "\n\n--- RESUME ---\n" + text
                 ),
                 tool_name=EXTRACT_TOOL["name"],
                 description=EXTRACT_TOOL["description"],
                 schema=EXTRACT_TOOL["input_schema"],
-                max_tokens=2000,
+                max_tokens=3000,
             )
             app_.resume_parsed = {**parsed, "model": model}
             app_.resume_parse_status = "done"

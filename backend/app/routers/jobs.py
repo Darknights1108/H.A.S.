@@ -67,13 +67,27 @@ PARSE_TOOL = {
                 "type": "number",
                 "description": "Minimum total bonus points for High band (default 15)",
             },
-            "unmapped": {
-                "type": "array", "items": {"type": "string"},
-                "description": "Requirements in the JD that CANNOT be expressed with the fields "
-                               "above (fixed application form) — list them so the admin knows.",
+            "criteria": {
+                "type": "object",
+                "description": "The digested screening profile of this JD. Resumes will be "
+                               "evaluated against these lists, so make them complete and specific.",
+                "properties": {
+                    "summary": {"type": "string",
+                                "description": "2-3 sentences: what this role actually does and needs"},
+                    "must_have": {
+                        "type": "array", "items": {"type": "string"},
+                        "description": "Hard requirements distilled from the JD as short specific "
+                                       "phrases, e.g. 'Java + Flink SQL hands-on experience'",
+                    },
+                    "nice_to_have": {
+                        "type": "array", "items": {"type": "string"},
+                        "description": "Advantages/bonus qualifications as short specific phrases",
+                    },
+                },
+                "required": ["summary", "must_have", "nice_to_have"],
             },
         },
-        "required": ["title", "description", "knockout", "bonus", "high_min_bonus", "unmapped"],
+        "required": ["title", "description", "knockout", "bonus", "high_min_bonus", "criteria"],
     },
 }
 
@@ -94,11 +108,15 @@ def parse_requirements(payload: ParseIn, db: Session = Depends(get_db),
     try:
         draft, model = llm.tool_call(
             prompt=(
-                "Extract screening rules from this job description. The application "
-                "form has FIXED fields (CGPA, degree field, full-time status, "
-                "programming languages, SQL knowledge, AI study, extra-curriculars), "
-                "so map requirements onto the tool schema and put anything that "
-                "doesn't fit into 'unmapped'.\n\n---\n" + payload.text
+                "Digest this job description into a screening configuration.\n"
+                "1) knockout/bonus: map what fits onto the FIXED application form "
+                "fields (CGPA, degree field, full-time status, programming languages, "
+                "SQL knowledge, AI study, extra-curriculars).\n"
+                "2) criteria: distill the FULL requirements of the role into a "
+                "screening profile — summary, must_have list, nice_to_have list. "
+                "Cover every skill/experience requirement (frameworks, tools, "
+                "concepts, soft skills). IGNORE benefits, perks, allowances and "
+                "company selling points.\n\n---\n" + payload.text
             ),
             tool_name=PARSE_TOOL["name"],
             description=PARSE_TOOL["description"],
@@ -117,8 +135,8 @@ def parse_requirements(payload: ParseIn, db: Session = Depends(get_db),
             "knockout": draft.get("knockout", {}),
             "bonus": draft.get("bonus", {}),
             "high_min_bonus": draft.get("high_min_bonus", 15),
+            "criteria": draft.get("criteria", {}),
         },
-        "unmapped": draft.get("unmapped", []),
         "model": model,
     }
 

@@ -19,6 +19,7 @@ type Requirements = {
   };
   bonus?: { ai_study?: number; eca?: number; extra_lang?: number };
   high_min_bonus?: number;
+  criteria?: { summary?: string; must_have?: string[]; nice_to_have?: string[] };
 };
 
 const emptyDraft = {
@@ -33,6 +34,9 @@ const emptyDraft = {
   eca: "8",
   extra_lang: "5",
   high_min_bonus: "15",
+  criteria_summary: "",
+  must_have: "",
+  nice_to_have: "",
 };
 
 export default function AdminJobsPage() {
@@ -40,7 +44,6 @@ export default function AdminJobsPage() {
   const [jobs, setJobs] = useState<JobRow[]>([]);
   const [jdText, setJdText] = useState("");
   const [draft, setDraft] = useState(emptyDraft);
-  const [unmapped, setUnmapped] = useState<string[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -85,6 +88,9 @@ export default function AdminJobsPage() {
       eca: bo.eca != null ? String(bo.eca) : "",
       extra_lang: bo.extra_lang != null ? String(bo.extra_lang) : "",
       high_min_bonus: String(j.requirements.high_min_bonus ?? 15),
+      criteria_summary: j.requirements.criteria?.summary ?? "",
+      must_have: (j.requirements.criteria?.must_have ?? []).join("\n"),
+      nice_to_have: (j.requirements.criteria?.nice_to_have ?? []).join("\n"),
     };
   }
 
@@ -106,7 +112,6 @@ export default function AdminJobsPage() {
   async function parseJd() {
     setBusy(true);
     setNotice(null);
-    setUnmapped([]);
     try {
       const r = await fetch(`${API}/api/jobs/parse`, {
         method: "POST",
@@ -133,8 +138,10 @@ export default function AdminJobsPage() {
         eca: bo.eca != null ? String(bo.eca) : "",
         extra_lang: bo.extra_lang != null ? String(bo.extra_lang) : "",
         high_min_bonus: String(data.requirements.high_min_bonus ?? 15),
+        criteria_summary: data.requirements.criteria?.summary ?? "",
+        must_have: (data.requirements.criteria?.must_have ?? []).join("\n"),
+        nice_to_have: (data.requirements.criteria?.nice_to_have ?? []).join("\n"),
       });
-      setUnmapped(data.unmapped ?? []);
       setShowForm(true);
       setNotice(`AI parsing done (${data.model}) — review the rules below, edit if needed, then create`);
     } catch (e) {
@@ -157,7 +164,17 @@ export default function AdminJobsPage() {
     if (draft.ai_study) bonus.ai_study = parseFloat(draft.ai_study);
     if (draft.eca) bonus.eca = parseFloat(draft.eca);
     if (draft.extra_lang) bonus.extra_lang = parseFloat(draft.extra_lang);
-    return { knockout, bonus, high_min_bonus: parseFloat(draft.high_min_bonus || "15") };
+    const toLines = (t: string) => t.split("\n").map((x) => x.trim()).filter(Boolean);
+    const criteria = {
+      summary: draft.criteria_summary.trim(),
+      must_have: toLines(draft.must_have),
+      nice_to_have: toLines(draft.nice_to_have),
+    };
+    return {
+      knockout, bonus,
+      high_min_bonus: parseFloat(draft.high_min_bonus || "15"),
+      criteria,
+    };
   }
 
   async function saveJob() {
@@ -183,7 +200,6 @@ export default function AdminJobsPage() {
       setJdText("");
       setShowForm(false);
       setEditingId(null);
-      setUnmapped([]);
       await load();
     } catch (e) {
       setNotice(String(e));
@@ -235,14 +251,7 @@ export default function AdminJobsPage() {
           </button>
         </p>
         {notice && <p style={{ color: notice.includes("failed") || notice.includes("HTTP") || notice.includes("not configured") ? "#dc2626" : "#2563eb" }}>{notice}</p>}
-        {unmapped.length > 0 && (
-          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px" }}>
-            <b>Requirements that could not be mapped to the form (needs human attention):</b>
-            <ul style={{ margin: "4px 0" }}>
-              {unmapped.map((u, i) => <li key={i}>{u}</li>)}
-            </ul>
-          </div>
-        )}
+
       </section>
 
       {showForm && (
@@ -281,6 +290,18 @@ export default function AdminJobsPage() {
           <label style={lbl}>High band threshold (bonus ≥ this → High)</label>
           <input style={input} type="number" value={draft.high_min_bonus}
             onChange={(e) => set("high_min_bonus", e.target.value)} />
+
+          <h3>AI screening profile — resumes are evaluated against these</h3>
+          <label style={lbl}>Role summary</label>
+          <textarea style={{ ...input, height: 60 }} value={draft.criteria_summary}
+            onChange={(e) => set("criteria_summary", e.target.value)} />
+          <label style={lbl}>Must-have requirements (one per line)</label>
+          <textarea style={{ ...input, height: 140 }} value={draft.must_have}
+            placeholder={"Java + Flink SQL hands-on experience\nKafka fundamentals"}
+            onChange={(e) => set("must_have", e.target.value)} />
+          <label style={lbl}>Nice-to-have (one per line)</label>
+          <textarea style={{ ...input, height: 110 }} value={draft.nice_to_have}
+            onChange={(e) => set("nice_to_have", e.target.value)} />
 
           <p>
             <button style={primary} disabled={busy || !draft.title} onClick={saveJob}>
@@ -333,6 +354,7 @@ export default function AdminJobsPage() {
 function RulesView({ req }: { req: Requirements }) {
   const ko = req.knockout ?? {};
   const bo = req.bonus ?? {};
+  const cr = req.criteria ?? {};
   const li: React.CSSProperties = { margin: "2px 0" };
   return (
     <div style={{ background: "#f9fafb", border: "1px solid #f1f3f5", borderRadius: 8, padding: "8px 14px", marginTop: 8, fontSize: 13 }}>
@@ -354,6 +376,28 @@ function RulesView({ req }: { req: Requirements }) {
         {bo.extra_lang != null && <li style={li}>Multiple languages +{bo.extra_lang}</li>}
         {bo.ai_study == null && bo.eca == null && bo.extra_lang == null && <li style={li}>(no bonus points)</li>}
       </ul>
+      {(cr.summary || (cr.must_have?.length ?? 0) > 0 || (cr.nice_to_have?.length ?? 0) > 0) && (
+        <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 10, paddingTop: 8 }}>
+          <b>AI screening profile — resumes are matched against this</b>
+          {cr.summary && <p style={{ margin: "6px 0", color: "#374151" }}>{cr.summary}</p>}
+          {(cr.must_have?.length ?? 0) > 0 && (
+            <>
+              <div style={{ fontWeight: 600, marginTop: 6 }}>Must have</div>
+              <ul style={{ margin: "4px 0" }}>
+                {cr.must_have!.map((x, i) => <li key={i} style={li}>{x}</li>)}
+              </ul>
+            </>
+          )}
+          {(cr.nice_to_have?.length ?? 0) > 0 && (
+            <>
+              <div style={{ fontWeight: 600, marginTop: 6 }}>Nice to have</div>
+              <ul style={{ margin: "4px 0" }}>
+                {cr.nice_to_have!.map((x, i) => <li key={i} style={li}>{x}</li>)}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

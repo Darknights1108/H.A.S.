@@ -38,9 +38,17 @@ type ResumeParsed = {
   ai_evidence?: string[];
   extracurricular?: string[];
   consistency_notes?: string[];
+  jd_match?: {
+    must_have?: MatchItem[];
+    nice_to_have?: MatchItem[];
+    match_score?: number;
+    verdict?: string;
+  };
   model?: string;
   error?: string;
 };
+
+type MatchItem = { criterion: string; met: "yes" | "partial" | "no" | "unknown"; evidence: string };
 
 export default function AdminApplicationsPage() {
   const { session, loading: authLoading } = useSession(true);
@@ -228,6 +236,25 @@ export default function AdminApplicationsPage() {
                             </ul>
                           </div>
                         )}
+                        {r.resume.parsed.jd_match &&
+                          ((r.resume.parsed.jd_match.must_have?.length ?? 0) > 0 ||
+                            (r.resume.parsed.jd_match.nice_to_have?.length ?? 0) > 0) && (
+                          <div style={{ background: "#eef2ff", border: "1px solid #c7d2fe",
+                                        borderRadius: 12, padding: "8px 12px", marginTop: 8 }}>
+                            <b style={{ fontSize: 13 }}>
+                              JD match
+                              {r.resume.parsed.jd_match.match_score != null &&
+                                ` — ${Math.round(r.resume.parsed.jd_match.match_score)}/100`}
+                            </b>
+                            {r.resume.parsed.jd_match.verdict && (
+                              <p style={{ fontSize: 13, margin: "4px 0 8px" }}>
+                                {r.resume.parsed.jd_match.verdict}
+                              </p>
+                            )}
+                            <MatchList label="Must have" items={r.resume.parsed.jd_match.must_have} />
+                            <MatchList label="Nice to have" items={r.resume.parsed.jd_match.nice_to_have} />
+                          </div>
+                        )}
                       </div>
                     )}
                     {r.resume.status === "failed" && (
@@ -247,6 +274,29 @@ export default function AdminApplicationsPage() {
         </tbody>
       </table>
     </main>
+  );
+}
+
+function MatchList({ label, items }: { label: string; items?: MatchItem[] }) {
+  if (!items || items.length === 0) return null;
+  const icon: Record<MatchItem["met"], string> = {
+    yes: "✓", partial: "◐", no: "✗", unknown: "?",
+  };
+  const color: Record<MatchItem["met"], string> = {
+    yes: "#059669", partial: "#b45309", no: "#dc2626", unknown: "#6b7280",
+  };
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600 }}>{label}</div>
+      <ul style={{ margin: "4px 0", paddingLeft: 18 }}>
+        {items.map((m, i) => (
+          <li key={i} style={{ fontSize: 13, margin: "2px 0" }}>
+            <b style={{ color: color[m.met] }}>{icon[m.met]}</b> {m.criterion}
+            <span style={{ color: "#6b7280" }}> — {m.evidence}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
