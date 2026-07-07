@@ -263,6 +263,12 @@ export default function ApplyPage() {
               By pressing Continue you confirm the information provided is accurate.
               Your data is processed for recruitment purposes only.
             </p>
+            {error && (
+              <p style={{ background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 8,
+                          padding: "8px 12px", color: "#dc2626", fontSize: 13 }}>
+                ⚠ {error}
+              </p>
+            )}
             <button
               style={primary}
               disabled={busy || !form.job_id || !form.name || !form.email || !form.cgpa}
