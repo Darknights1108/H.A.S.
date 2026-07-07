@@ -98,6 +98,44 @@ def expire_no_response() -> int:
         db.close()
 
 
+def auto_send_low_reject_emails() -> int:
+    """Low(初筛淘汰)的婉拒信:草稿满 N 天后自动发送。
+
+    其他拒信(人工拒 / 面试未过 / 超时)仍需 admin 在 Outbox 人工发送。
+    发送失败保留草稿,次日重试。
+    """
+    from sqlalchemy import select as _select
+
+    from .models import Application, EmailLog
+    from .services.mailer import try_send_draft
+    from .services.scheduling import get_setting_int
+
+    db = SessionLocal()
+    try:
+        days = get_setting_int(db, "low_reject_send_days", 2)
+        cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
+        drafts = db.scalars(
+            _select(EmailLog)
+            .join(Application, Application.id == EmailLog.application_id)
+            .where(
+                EmailLog.type == "reject",
+                EmailLog.status == "draft",
+                EmailLog.created_at < cutoff,
+                Application.rejected_reason == "low_band",
+            )
+        ).all()
+        sent = 0
+        for email in drafts:
+            if try_send_draft(db, email):
+                sent += 1
+        db.commit()
+        if sent:
+            logger.info("auto-sent %d low-band rejection letter(s)", sent)
+        return sent
+    finally:
+        db.close()
+
+
 def start_scheduler() -> None:
     global _scheduler
     if _scheduler is not None:
@@ -106,6 +144,8 @@ def start_scheduler() -> None:
     # 每天 02:00 / 02:05 MYT
     _scheduler.add_job(expire_stale_shortlist, "cron", hour=2, id="expire_shortlist")
     _scheduler.add_job(expire_no_response, "cron", hour=2, minute=5, id="expire_no_response")
+    _scheduler.add_job(auto_send_low_reject_emails, "cron", hour=2, minute=10,
+                       id="auto_send_low_reject")
     _scheduler.start()
     logger.info("scheduler started")
 

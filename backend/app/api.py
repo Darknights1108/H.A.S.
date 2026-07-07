@@ -24,6 +24,7 @@ SETTING_RULES: dict[str, dict] = {
     "panel_max_interviewers": {"type": "int", "min": 1, "max": 20},
     "reschedule_max": {"type": "int", "min": 0, "max": 20},  # 0 = 不限次
     "candidate_response_days": {"type": "int", "min": 1, "max": 90},
+    "low_reject_send_days": {"type": "int", "min": 0, "max": 30},
     "work_start_hour": {"type": "int", "min": 0, "max": 23},
     "work_end_hour": {"type": "int", "min": 1, "max": 24},
     "company_name": {"type": "str", "min_len": 1, "max_len": 80},

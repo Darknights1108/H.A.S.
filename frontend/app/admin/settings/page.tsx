@@ -19,6 +19,7 @@ const LABELS: Record<string, string> = {
   panel_max_interviewers: "Max interviewers per slot (panel)",
   reschedule_max: "Max reschedules (0 = unlimited)",
   candidate_response_days: "Candidate response window (days after invite)",
+  low_reject_send_days: "Auto-send Low rejection letters after (days)",
   work_start_hour: "Working hours start (hour, for slot generation)",
   work_end_hour: "Working hours end (hour, exclusive)",
   company_name: "Company name (letter signature)",
@@ -34,6 +35,7 @@ const TEMPLATE_KEYS = new Set(["invite_email_subject", "invite_email_template"])
 const ORDER = [
   "shortlist_review_days",
   "candidate_response_days",
+  "low_reject_send_days",
   "slot_duration_minutes",
   "work_start_hour",
   "work_end_hour",

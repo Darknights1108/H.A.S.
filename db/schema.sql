@@ -49,6 +49,7 @@ INSERT INTO app_setting (key, value, description) VALUES
     ('work_start_hour',       '9',    'Slot generation: working hours start (MYT)'),
     ('work_end_hour',         '18',   'Slot generation: working hours end (exclusive)'),
     ('invite_email_subject',  '"Interview invitation — {job_title}"', 'Invite email subject (supports placeholders)'),
+    ('low_reject_send_days',  '2',    'Auto-send low-band rejection letters after this many days'),
     ('invite_email_template', '"Hi {candidate_name},\n\nCongratulations! You have been shortlisted for {job_title}.\n\nPlease pick an interview time that suits you using your personal booking link:\n{booking_url}\n\nAll interviews are conducted online (times in MYT, UTC+08:00).\n\nBest Regards,\n{company_name} Recruiting Team\n"', 'Invite email body template. Placeholders: {candidate_name} {job_title} {booking_url} {company_name}')
 ON CONFLICT (key) DO NOTHING;
 

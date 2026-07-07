@@ -54,6 +54,10 @@ export default function AdminEmailsPage() {
     <main style={{ maxWidth: 900 }}>
       <AdminBar session={session} />
       <h1>Email outbox</h1>
+      <p style={{ color: "#6b7280", fontSize: 13 }}>
+        Low-band rejection drafts are sent automatically after the delay set in
+        Settings; everything else stays here until you press Send.
+      </p>
       {!smtpConfigured && (
         <p style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px" }}>
           ⚠ SMTP not configured — set SMTP_HOST / SMTP_USER / SMTP_PASSWORD in the root .env and restart the backend to enable real sending.
