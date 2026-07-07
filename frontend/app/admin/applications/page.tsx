@@ -99,7 +99,9 @@ export default function AdminApplicationsPage() {
     else
       setNotice(
         result === "passed"
-          ? "✅ Accepted — offer letter drafted, review & send it on the Emails page"
+          ? data.offer_sent
+            ? "✅ Accepted — offer letter sent to the candidate"
+            : "✅ Accepted — offer drafted but sending failed; send it manually on the Emails page"
           : "✅ Rejected — rejection letter drafted, review & send it on the Emails page"
       );
     await load();
@@ -203,7 +205,7 @@ export default function AdminApplicationsPage() {
                     ⚠ Confirm marking <b>{r.candidate.name}</b> as{" "}
                     <b style={{ color: pending.result === "passed" ? "#059669" : "#dc2626" }}>
                       {pending.result === "passed"
-                        ? "ACCEPTED (offer letter will be drafted)"
+                        ? "ACCEPTED (offer letter will be SENT immediately)"
                         : "REJECTED (rejection letter will be drafted)"}
                     </b>
                     ? This cannot be undone.{" "}

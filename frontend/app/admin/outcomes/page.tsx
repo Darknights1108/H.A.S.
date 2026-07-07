@@ -50,7 +50,9 @@ export default function OutcomesPage() {
       else
         setNotice(
           result === "passed"
-            ? "✅ Accepted — offer letter drafted, review & send it on the Emails page"
+            ? data.offer_sent
+              ? "✅ Accepted — offer letter sent to the candidate"
+              : "✅ Accepted — offer drafted but sending failed; send it manually on the Emails page"
             : "✅ Rejected — rejection letter drafted, review & send it on the Emails page"
         );
       await load();
@@ -78,9 +80,9 @@ export default function OutcomesPage() {
       <AdminBar session={session} />
       <h1>Interview outcomes</h1>
       <p style={{ color: "#6b7280" }}>
-        Decide on candidates after their interview. Accept drafts an offer
-        letter; Reject drafts a rejection letter — both go to the Emails page
-        for review before sending.
+        Decide on candidates after their interview. Accept sends the offer
+        letter immediately; Reject drafts a rejection letter for manual review
+        on the Emails page.
       </p>
       {notice && <p style={{ color: "#2563eb" }}>{notice}</p>}
 
@@ -129,7 +131,7 @@ export default function OutcomesPage() {
                 ⚠ Confirm marking <b>{r.candidate.name}</b> as{" "}
                 <b style={{ color: pending.result === "passed" ? "#059669" : "#dc2626" }}>
                   {pending.result === "passed"
-                    ? "ACCEPTED (offer letter will be drafted)"
+                    ? "ACCEPTED (offer letter will be SENT immediately)"
                     : "REJECTED (rejection letter will be drafted)"}
                 </b>
                 ? This cannot be undone.{" "}

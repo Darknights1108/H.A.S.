@@ -25,6 +25,7 @@ from ..database import get_db
 from ..models import (Application, Candidate, EmailLog, Interview, Interviewer, Job,
                       Score, Slot, SlotInterviewer, UserSession)
 from ..services import llm
+from ..services.mailer import try_send_draft
 from ..services.resume import ALLOWED_EXTS, MAX_SIZE, extract_text, parse_resume_async
 from ..services.scheduling import draft_email
 from ..services.scoring import score_application
@@ -499,10 +500,13 @@ def record_outcome(
     job = db.get(Job, app_.job_id)
 
     interview.status = payload.result
+    offer_sent = False
     if payload.result == "passed":
         app_.status = "passed"
         subject, body = offer_email(db, candidate, job)
         email = draft_email(db, app_, "offer", subject, body)
+        db.flush()
+        offer_sent = try_send_draft(db, email)  # Accept 即发送;失败保留草稿可人工重发
     else:
         app_.status = "rejected"
         app_.rejected_reason = "interview_failed"
@@ -514,6 +518,7 @@ def record_outcome(
         "status": app_.status,
         "interview_status": interview.status,
         "email_draft_id": str(email.id),
+        "offer_sent": offer_sent,
     }
 
 
