@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_session, require_admin
 from ..config import settings
 from ..database import get_db
-from ..models import Application, Candidate, Interview, Job, Score, Slot, UserSession
+from ..models import Application, Candidate, EmailLog, Interview, Job, Score, Slot, UserSession
 from ..services import llm
 from ..services.resume import ALLOWED_EXTS, MAX_SIZE, extract_text, parse_resume_async
 from ..services.scheduling import draft_email
@@ -329,6 +329,13 @@ def list_applications(db: Session = Depends(get_db),
         .outerjoin(Score, Score.application_id == Application.id)
         .order_by(Application.submitted_at.desc())
     ).all()
+    # 邀请信状态(none/draft/sent)——给审查页显示与按钮控制
+    invite_map: dict = {}
+    for app_id, status in db.execute(
+        select(EmailLog.application_id, EmailLog.status).where(EmailLog.type == "invite")
+    ):
+        if invite_map.get(app_id) != "sent":
+            invite_map[app_id] = status
     # 各申请当前排定的面试(用于显示时间 + Pass/Fail 操作)
     itv_map = {
         i.application_id: (i, sl)
@@ -353,6 +360,7 @@ def list_applications(db: Session = Depends(get_db),
             "total_score": float(s.total_score) if s and s.total_score is not None else None,
             "reasoning": s.reasoning if s else None,
             "skills": (a.form_data or {}).get("skills") or [],
+            "invite_status": invite_map.get(a.id, "none"),
             "booking_url": f"{settings.frontend_base_url}/booking/{a.booking_token}",
             "submitted_at": a.submitted_at.isoformat(),
             "resume": {
@@ -383,9 +391,22 @@ def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)
         raise HTTPException(404, "application not found")
     if app_.status != "shortlisted":
         raise HTTPException(409, f"application not in shortlist ({app_.status})")
+    booking_url = f"{settings.frontend_base_url}/booking/{app_.booking_token}"
+    # 幂等:已有邀请信就不再重复起草
+    existing = db.scalar(
+        select(EmailLog).where(
+            EmailLog.application_id == app_.id, EmailLog.type == "invite"
+        ).order_by(EmailLog.created_at.desc())
+    )
+    if existing is not None:
+        return {
+            "application_id": str(app_.id),
+            "invite_email_id": str(existing.id),
+            "booking_url": booking_url,
+            "already": existing.status,  # draft | sent
+        }
     candidate = db.get(Candidate, app_.candidate_id)
     job = db.get(Job, app_.job_id)
-    booking_url = f"{settings.frontend_base_url}/booking/{app_.booking_token}"
     subject, body = invite_email(db, candidate, job, booking_url)
     email = draft_email(db, app_, "invite", subject, body)
     db.commit()

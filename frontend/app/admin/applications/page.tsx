@@ -22,6 +22,7 @@ type Row = {
   booking_url: string;
   submitted_at: string;
   interview: { date: string; start: string; end: string; meeting_link: string | null } | null;
+  invite_status: "none" | "draft" | "sent";
   resume: {
     uploaded: boolean;
     status: "none" | "pending" | "done" | "failed";
@@ -76,7 +77,12 @@ export default function AdminApplicationsPage() {
     });
     const data = await r.json();
     if (!r.ok) setNotice(data.detail ?? `HTTP ${r.status}`);
-    else if (action === "approve") setNotice(`Invite drafted — booking link: ${data.booking_url}`);
+    else if (action === "approve")
+      setNotice(
+        data.already
+          ? `Invite was already ${data.already === "sent" ? "sent" : "drafted"} for this candidate`
+          : "✅ Invite drafted — review & send it on the Emails page"
+      );
     await load();
   }
 
@@ -132,6 +138,12 @@ export default function AdminApplicationsPage() {
                 <td style={td}>
                   {r.status}
                   {r.rejected_reason && <div style={sub}>{r.rejected_reason}</div>}
+                  {r.invite_status === "draft" && (
+                    <div style={{ ...sub, color: "#b45309" }}>✉ invite drafted — send it in Emails</div>
+                  )}
+                  {r.invite_status === "sent" && (
+                    <div style={{ ...sub, color: "#059669" }}>✉ invite sent</div>
+                  )}
                   {r.interview && (
                     <div style={sub}>
                       🗓 {r.interview.date} {r.interview.start}–{r.interview.end}
@@ -153,9 +165,15 @@ export default function AdminApplicationsPage() {
                   </button>{" "}
                   {r.status === "shortlisted" && (
                     <>
-                      <button style={{ ...btnSm, background: "#059669" }} onClick={() => act(r.id, "approve")}>
-                        Approve
-                      </button>{" "}
+                      {r.invite_status === "none" ? (
+                        <button style={{ ...btnSm, background: "#059669" }} onClick={() => act(r.id, "approve")}>
+                          Approve
+                        </button>
+                      ) : (
+                        <span style={{ ...btnSm, background: "#f3f4f6", color: "#059669", cursor: "default" }}>
+                          Invited ✓
+                        </span>
+                      )}{" "}
                       <button style={{ ...btnSm, background: "#dc2626" }} onClick={() => act(r.id, "reject")}>
                         Reject
                       </button>
