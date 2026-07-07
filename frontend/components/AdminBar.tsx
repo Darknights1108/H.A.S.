@@ -7,6 +7,7 @@ const LINKS: [string, string, boolean][] = [
   // [href, label, adminOnly]
   ["/admin/applications", "Applications", true],
   ["/admin/jobs", "Jobs", true],
+  ["/admin/outcomes", "Outcomes", true],
   ["/admin/slots", "Slots", false],
   ["/admin/resumes", "Resumes", false],
   ["/admin/emails", "Emails", true],

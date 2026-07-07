@@ -22,7 +22,8 @@ from sqlalchemy.orm import Session
 from ..auth import get_session, require_admin
 from ..config import settings
 from ..database import get_db
-from ..models import Application, Candidate, EmailLog, Interview, Job, Score, Slot, UserSession
+from ..models import (Application, Candidate, EmailLog, Interview, Interviewer, Job,
+                      Score, Slot, SlotInterviewer, UserSession)
 from ..services import llm
 from ..services.resume import ALLOWED_EXTS, MAX_SIZE, extract_text, parse_resume_async
 from ..services.scheduling import draft_email
@@ -345,6 +346,16 @@ def list_applications(db: Session = Depends(get_db),
             .where(Interview.status == "scheduled")
         )
     }
+    # 面试 panel 名单
+    slot_ids = [sl.id for _, sl in itv_map.values()]
+    panel_map: dict = {}
+    if slot_ids:
+        for sid, name in db.execute(
+            select(SlotInterviewer.slot_id, Interviewer.name)
+            .join(Interviewer, Interviewer.id == SlotInterviewer.interviewer_id)
+            .where(SlotInterviewer.slot_id.in_(slot_ids))
+        ):
+            panel_map.setdefault(sid, []).append(name)
     return [
         {
             "id": str(a.id),
@@ -374,6 +385,7 @@ def list_applications(db: Session = Depends(get_db),
                     "start": itv_map[a.id][1].start_time.strftime("%H:%M"),
                     "end": itv_map[a.id][1].end_time.strftime("%H:%M"),
                     "meeting_link": itv_map[a.id][0].meeting_link,
+                    "panel": panel_map.get(itv_map[a.id][1].id, []),
                 }
                 if a.id in itv_map
                 else None
