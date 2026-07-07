@@ -1,8 +1,10 @@
-"""Analytics API:招聘漏斗与运营指标聚合(admin)。"""
+"""Analytics API:招聘漏斗与运营指标聚合 + Excel 导出(admin)。"""
 
 import datetime
+import io
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy import Date, cast, distinct, func, select
 from sqlalchemy.orm import Session
 
@@ -21,12 +23,21 @@ from ..models import (
     UserSession,
 )
 
+
+def _analytics_payload(db: Session) -> dict:
+    """聚合逻辑供 JSON 端点与 Excel 导出共用。"""
+    return _compute_analytics(db)
+
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
 @router.get("")
 def analytics(db: Session = Depends(get_db),
               _admin: UserSession = Depends(require_admin)) -> dict:
+    return _compute_analytics(db)
+
+
+def _compute_analytics(db: Session) -> dict:
     today = datetime.date.today()
 
     total_apps = db.scalar(select(func.count()).select_from(Application)) or 0
@@ -149,3 +160,128 @@ def analytics(db: Session = Depends(get_db),
         },
         "interviewer_load": interviewer_load,
     }
+
+
+# ---------- Excel 导出 ----------
+
+@router.get("/export")
+def export_excel(db: Session = Depends(get_db),
+                 _admin: UserSession = Depends(require_admin)) -> StreamingResponse:
+    """汇总指标 + 原始明细导出为多 sheet 的 .xlsx,供外部分析。"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font
+
+    a = _compute_analytics(db)
+    wb = Workbook()
+    bold = Font(bold=True)
+
+    def sheet(title: str, headers: list[str], rows: list[list]) -> None:
+        ws = wb.create_sheet(title)
+        ws.append(headers)
+        for cell in ws[1]:
+            cell.font = bold
+        for row in rows:
+            ws.append(row)
+        # 简单列宽自适应
+        for col in ws.columns:
+            width = max((len(str(c.value)) for c in col if c.value is not None), default=8)
+            ws.column_dimensions[col[0].column_letter].width = min(width + 2, 50)
+
+    # Overview
+    ws = wb.active
+    ws.title = "Overview"
+    ov = a["overview"]
+    for k, v in [
+        ("Generated at", datetime.datetime.now().strftime("%Y-%m-%d %H:%M")),
+        ("Total applications", ov["total_applications"]),
+        ("Total candidates", ov["total_candidates"]),
+        ("Open jobs", ov["open_jobs"]),
+        ("Offers (passed)", ov["offers"]),
+        ("Avg days to book", ov["avg_days_to_book"] if ov["avg_days_to_book"] is not None else "n/a"),
+    ]:
+        ws.append([k, v])
+    for row in ws.iter_rows(min_col=1, max_col=1):
+        row[0].font = bold
+    ws.column_dimensions["A"].width = 24
+
+    sheet("Funnel", ["Stage", "Count"], [[f["stage"], f["count"]] for f in a["funnel"]])
+    sheet("Breakdowns", ["Category", "Key", "Count"],
+          [["band", b, n] for b, n in a["bands"].items()]
+          + [["status", k, v] for k, v in a["statuses"].items()]
+          + [["rejection_reason", k, v] for k, v in a["rejection_reasons"].items()])
+    sheet("Daily applications", ["Date", "Count"],
+          [[d["date"], d["count"]] for d in a["daily_applications"]])
+
+    # Applications 原始明细
+    app_rows = db.execute(
+        select(Application, Candidate, Job, Score)
+        .join(Candidate, Candidate.id == Application.candidate_id)
+        .join(Job, Job.id == Application.job_id)
+        .outerjoin(Score, Score.application_id == Application.id)
+        .order_by(Application.submitted_at)
+    ).all()
+    rows = []
+    for ap, c, j, sc in app_rows:
+        fd = ap.form_data or {}
+        jd = (ap.resume_parsed or {}).get("jd_match") or {}
+        rows.append([
+            ap.submitted_at.strftime("%Y-%m-%d %H:%M"),
+            c.name, c.email, j.title,
+            fd.get("education_level") or "",
+            ap.degree_field or "", fd.get("institution") or "",
+            float(ap.cgpa) if ap.cgpa is not None else None,
+            "yes" if ap.is_fulltime else "no",
+            ", ".join(ap.prog_langs or []),
+            "yes" if ap.has_sql else "no",
+            "yes" if ap.has_ai_study else "no",
+            ", ".join(fd.get("skills") or []),
+            sc.band if sc else "",
+            float(sc.total_score) if sc and sc.total_score is not None else None,
+            jd.get("match_score"),
+            ap.status, ap.rejected_reason or "",
+            "yes" if ap.resume_file_url else "no",
+            fd.get("preferred_start_date") or "",
+            fd.get("salary_expectation") or "",
+            fd.get("heard_about_us") or "",
+        ])
+    sheet("Applications", [
+        "Submitted", "Candidate", "Email", "Job", "Education level", "Field",
+        "Institution", "CGPA", "Full-time", "Languages", "SQL", "AI",
+        "Skills", "Band", "Score", "JD match", "Status", "Rejected reason",
+        "Resume", "Preferred start", "Salary expectation", "Source",
+    ], rows)
+
+    # Interviews 明细
+    itv_rows = db.execute(
+        select(Interview, Slot, Application, Candidate, Job)
+        .join(Slot, Slot.id == Interview.slot_id)
+        .join(Application, Application.id == Interview.application_id)
+        .join(Candidate, Candidate.id == Application.candidate_id)
+        .join(Job, Job.id == Application.job_id)
+        .order_by(Slot.slot_date, Slot.start_time)
+    ).all()
+    panel_map: dict = {}
+    for sid, name in db.execute(
+        select(SlotInterviewer.slot_id, Interviewer.name)
+        .join(Interviewer, Interviewer.id == SlotInterviewer.interviewer_id)
+    ).all():
+        panel_map.setdefault(sid, []).append(name)
+    sheet("Interviews", ["Date", "Time", "Candidate", "Job", "Panel", "Status", "Reschedules"],
+          [[sl.slot_date.isoformat(),
+            f"{sl.start_time.strftime('%H:%M')}-{sl.end_time.strftime('%H:%M')}",
+            c.name, j.title, ", ".join(panel_map.get(sl.id, [])),
+            itv.status, itv.reschedule_count]
+           for itv, sl, ap, c, j in itv_rows])
+
+    sheet("Interviewer load", ["Interviewer", "Claimed slots", "Booked"],
+          [[i["name"], i["claimed"], i["booked"]] for i in a["interviewer_load"]])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    filename = f"has-analytics-{datetime.date.today().isoformat()}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

@@ -42,7 +42,18 @@ export default function AnalyticsPage() {
   return (
     <main style={{ maxWidth: 960 }}>
       <AdminBar session={session} />
-      <h1>Analytics</h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <h1 style={{ flex: 1 }}>Analytics</h1>
+        <a
+          href={`${API}/api/analytics/export`}
+          style={{
+            padding: "8px 18px", borderRadius: 8, background: "#059669",
+            color: "#fff", textDecoration: "none", fontSize: 14,
+          }}
+        >
+          ⬇ Export to Excel
+        </a>
+      </div>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <Card label="Applications" value={overview.total_applications} />
