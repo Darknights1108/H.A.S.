@@ -43,8 +43,9 @@ PARSE_TOOL = {
                     "min_cgpa": {"type": "number", "description": "Minimum CGPA on a 4.00 scale"},
                     "fields": {
                         "type": "array", "items": {"type": "string"},
-                        "description": "Accepted degree fields. Use short labels matching the "
-                                       "application form where possible: CS, SE, IS, IT, Data Science",
+                        "description": "Accepted degree fields, full names, e.g. Computer Science, "
+                                       "Software Engineering, Data Science, Engineering, Business, "
+                                       "Accounting, Finance, Marketing. OMIT if the JD accepts any field.",
                     },
                     "require_fulltime": {"type": "boolean"},
                     "langs_any": {

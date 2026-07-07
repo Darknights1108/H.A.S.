@@ -6,15 +6,23 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 type JobOpt = { id: string; title: string; description: string | null };
 
-const DEGREE_FIELDS = ["CS", "SE", "IS", "IT", "Data Science", "Other"];
-const LANGS = ["Python", "PHP", "Java", "JavaScript", "C++", "Go"];
+const DEGREE_FIELDS = [
+  "Computer Science", "Software Engineering", "Information Technology",
+  "Information Systems", "Data Science", "Engineering", "Business",
+  "Accounting", "Finance", "Marketing", "Human Resources", "Design",
+  "Science", "Education", "Healthcare", "Law", "Other",
+];
+const EDU_LEVELS = [
+  "Diploma", "Bachelor's Degree", "Master's Degree", "PhD",
+  "Professional Certificate", "Other",
+];
 const SOURCES = ["LinkedIn", "JobStreet", "University / Career fair", "Friend or referral", "Company website", "Other"];
 
 const SECTIONS: [string, string][] = [
   ["position", "Position"],
   ["resume", "Resume"],
   ["contact", "Contact Information"],
-  ["academic", "Academic & Skills"],
+  ["academic", "Academic Background"],
   ["additional", "Additional Information"],
   ["consent", "Consent & Submit"],
 ];
@@ -26,26 +34,22 @@ export default function ApplyPage() {
     name: "",
     email: "",
     phone: "",
+    education_level: "Bachelor's Degree",
+    degree_field: "Computer Science",
+    institution: "",
     cgpa: "",
-    degree_field: "CS",
     is_fulltime: true,
-    prog_langs: [] as string[],
-    has_sql: false,
-    has_ai_study: false,
     eca: "",
     consent_talent_bank: false,
     preferred_start_date: "",
     salary_expectation: "",
     heard_about_us: "",
   });
-  const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [resume, setResume] = useState<File | null>(null);
-  const [skills, setSkills] = useState<string[]>([]);
-  const [suggested, setSuggested] = useState<string[]>([]);
   const [suggesting, setSuggesting] = useState(false);
-  const [skillInput, setSkillInput] = useState("");
+  const [detected, setDetected] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`${API}/api/jobs`)
@@ -63,16 +67,11 @@ export default function ApplyPage() {
 
   const selectedJob = jobs.find((j) => j.id === form.job_id);
 
-  function addSkill(label: string) {
-    const v = label.trim();
-    if (!v) return;
-    setSkills((prev) => (prev.some((x) => x.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]));
-    setSuggested((prev) => prev.filter((x) => x.toLowerCase() !== v.toLowerCase()));
-  }
-
+  // 选中简历后立即 AI 提取技能,暂存给下一步 Skill Assessment 页
   async function onResumePicked(file: File | null) {
     setResume(file);
-    setSuggested([]);
+    setDetected(null);
+    sessionStorage.removeItem("has_resume_skills");
     if (!file) return;
     setSuggesting(true);
     try {
@@ -81,11 +80,11 @@ export default function ApplyPage() {
       const r = await fetch(`${API}/api/resume/skill-suggest`, { method: "POST", body: fd });
       if (r.ok) {
         const data = await r.json();
-        const have = new Set(skills.map((x) => x.toLowerCase()));
-        setSuggested((data.skills as string[]).filter((x) => !have.has(x.toLowerCase())));
+        sessionStorage.setItem("has_resume_skills", JSON.stringify(data.skills ?? []));
+        setDetected((data.skills ?? []).length);
       }
     } catch {
-      /* suggestions are best-effort */
+      /* best-effort */
     } finally {
       setSuggesting(false);
     }
@@ -103,12 +102,10 @@ export default function ApplyPage() {
       fd.append("cgpa", form.cgpa);
       fd.append("degree_field", form.degree_field);
       fd.append("is_fulltime", String(form.is_fulltime));
-      fd.append("prog_langs", JSON.stringify(form.prog_langs));
-      fd.append("has_sql", String(form.has_sql));
-      fd.append("has_ai_study", String(form.has_ai_study));
+      fd.append("education_level", form.education_level);
+      if (form.institution) fd.append("institution", form.institution);
       if (form.eca) fd.append("eca", form.eca);
       fd.append("consent_talent_bank", String(form.consent_talent_bank));
-      fd.append("skills", JSON.stringify(skills));
       if (form.preferred_start_date) fd.append("preferred_start_date", form.preferred_start_date);
       if (form.salary_expectation) fd.append("salary_expectation", form.salary_expectation);
       if (form.heard_about_us) fd.append("heard_about_us", form.heard_about_us);
@@ -122,22 +119,12 @@ export default function ApplyPage() {
           : data.detail;
         throw new Error(detail ?? `HTTP ${r.status}`);
       }
-      setResult(data.message);
-      window.scrollTo({ top: 0 });
+      // 进入第二步:Skill Assessment
+      window.location.href = `/apply/skills?token=${data.skill_token}`;
     } catch (e) {
       setError(String(e));
-    } finally {
       setBusy(false);
     }
-  }
-
-  if (result) {
-    return (
-      <main style={{ maxWidth: 560, margin: "12vh auto 0", textAlign: "center" }}>
-        <h1>Thank you!</h1>
-        <p>{result}</p>
-      </main>
-    );
   }
 
   return (
@@ -154,11 +141,11 @@ export default function ApplyPage() {
       </div>
       <p style={{ color: "#6b7280", fontSize: 13 }}>
         Required fields are indicated with <span style={{ color: "#dc2626" }}>*</span>
+        {" · "}After submitting you will be asked to confirm your skills.
       </p>
       {error && <p style={{ color: "#dc2626" }}>{error}</p>}
 
       <div style={{ display: "flex", gap: 28, alignItems: "flex-start" }}>
-        {/* left step nav */}
         <nav style={sideNav}>
           {SECTIONS.map(([id, label]) => (
             <a key={id} href={`#${id}`} style={navItem}>
@@ -166,9 +153,12 @@ export default function ApplyPage() {
               {label}
             </a>
           ))}
+          <span style={{ ...navItem, color: "#9ca3af" }}>
+            <span style={{ ...navDot, borderColor: "#d1d5db" }} />
+            Skill Assessment (next step)
+          </span>
         </nav>
 
-        {/* form sections */}
         <div style={{ flex: 1, minWidth: 320 }}>
           <section id="position" style={card}>
             <h2 style={h2}>Position</h2>
@@ -200,6 +190,11 @@ export default function ApplyPage() {
                 Analyzing resume for skills…
               </p>
             )}
+            {detected != null && !suggesting && (
+              <p style={{ color: "#6b7280", fontSize: 13, marginBottom: 0 }}>
+                {detected} skills detected — you can confirm them in the next step.
+              </p>
+            )}
           </section>
 
           <section id="contact" style={card}>
@@ -213,99 +208,26 @@ export default function ApplyPage() {
           </section>
 
           <section id="academic" style={card}>
-            <h2 style={h2}>Academic & Skills</h2>
-            <label style={lbl}>CGPA (0.00 – 4.00) <Req /></label>
-            <input style={input} type="number" step="0.01" min="0" max="4" value={form.cgpa}
-              onChange={(e) => set("cgpa", e.target.value)} />
-            <label style={lbl}>Degree field <Req /></label>
+            <h2 style={h2}>Academic Background</h2>
+            <label style={lbl}>Education level <Req /></label>
+            <select style={input} value={form.education_level}
+              onChange={(e) => set("education_level", e.target.value)}>
+              {EDU_LEVELS.map((x) => <option key={x}>{x}</option>)}
+            </select>
+            <label style={lbl}>Field of study <Req /></label>
             <select style={input} value={form.degree_field} onChange={(e) => set("degree_field", e.target.value)}>
               {DEGREE_FIELDS.map((d) => <option key={d}>{d}</option>)}
             </select>
+            <label style={lbl}>Institution</label>
+            <input style={input} placeholder="e.g. Universiti Malaya" value={form.institution}
+              onChange={(e) => set("institution", e.target.value)} />
+            <label style={lbl}>CGPA (0.00 – 4.00) <Req /></label>
+            <input style={input} type="number" step="0.01" min="0" max="4" value={form.cgpa}
+              onChange={(e) => set("cgpa", e.target.value)} />
             <label style={chk}>
               <input type="checkbox" checked={form.is_fulltime}
                 onChange={(e) => set("is_fulltime", e.target.checked)} /> Full-time student
             </label>
-            <label style={lbl}>Programming languages</label>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {LANGS.map((l) => (
-                <label key={l} style={chk}>
-                  <input
-                    type="checkbox"
-                    checked={form.prog_langs.includes(l)}
-                    onChange={(e) =>
-                      set(
-                        "prog_langs",
-                        e.target.checked
-                          ? [...form.prog_langs, l]
-                          : form.prog_langs.filter((x) => x !== l)
-                      )
-                    }
-                  /> {l}
-                </label>
-              ))}
-            </div>
-            <label style={chk}>
-              <input type="checkbox" checked={form.has_sql}
-                onChange={(e) => set("has_sql", e.target.checked)} /> I know SQL
-            </label>
-            <label style={chk}>
-              <input type="checkbox" checked={form.has_ai_study}
-                onChange={(e) => set("has_ai_study", e.target.checked)} /> I have studied AI (courses/projects)
-            </label>
-
-            <label style={lbl}>Skills</label>
-            <div style={{ color: "#6b7280", fontSize: 12, marginTop: 2 }}>
-              Add your skills manually, or pick from the suggestions extracted from your resume.
-            </div>
-            {skills.length > 0 && (
-              <div style={chipRow}>
-                {skills.map((x) => (
-                  <span key={x} style={chipSelected}>
-                    {x}
-                    <button style={chipBtn} onClick={() => setSkills(skills.filter((y) => y !== x))}>
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <input
-                style={{ ...input, marginTop: 0, flex: 1 }}
-                placeholder="e.g. Docker, Public speaking…"
-                value={skillInput}
-                onChange={(e) => setSkillInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    addSkill(skillInput);
-                    setSkillInput("");
-                  }
-                }}
-              />
-              <button
-                style={{ ...primary, padding: "8px 16px" }}
-                onClick={() => {
-                  addSkill(skillInput);
-                  setSkillInput("");
-                }}
-              >
-                Add
-              </button>
-            </div>
-            {suggested.length > 0 && (
-              <>
-                <div style={{ color: "#6b7280", fontSize: 12, marginTop: 12 }}>
-                  Suggested from your resume — click to add:
-                </div>
-                <div style={chipRow}>
-                  {suggested.map((x) => (
-                    <button key={x} style={chipSuggested} onClick={() => addSkill(x)}>
-                      {x} +
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
           </section>
 
           <section id="additional" style={card}>
@@ -338,7 +260,7 @@ export default function ApplyPage() {
               I consent to my data being kept in the talent bank for future opportunities
             </label>
             <p style={{ color: "#6b7280", fontSize: 12 }}>
-              By pressing Submit you confirm the information provided is accurate.
+              By pressing Continue you confirm the information provided is accurate.
               Your data is processed for recruitment purposes only.
             </p>
             <button
@@ -346,7 +268,7 @@ export default function ApplyPage() {
               disabled={busy || !form.job_id || !form.name || !form.email || !form.cgpa}
               onClick={submit}
             >
-              {busy ? "Submitting…" : "Submit application"}
+              {busy ? "Submitting…" : "Continue to Skill Assessment →"}
             </button>
           </section>
         </div>
@@ -397,20 +319,4 @@ const chk: React.CSSProperties = { display: "block", marginTop: 10 };
 const primary: React.CSSProperties = {
   padding: "10px 22px", border: "none", borderRadius: 8,
   background: "#4338ca", color: "#fff", cursor: "pointer",
-};
-const chipRow: React.CSSProperties = {
-  display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8,
-};
-const chipSelected: React.CSSProperties = {
-  display: "inline-flex", alignItems: "center", gap: 4,
-  background: "#eef2ff", color: "#4338ca", fontWeight: 600,
-  borderRadius: 999, padding: "4px 6px 4px 12px", fontSize: 13,
-};
-const chipBtn: React.CSSProperties = {
-  border: "none", background: "transparent", color: "#4338ca",
-  fontSize: 15, lineHeight: 1, padding: "0 6px", cursor: "pointer",
-};
-const chipSuggested: React.CSSProperties = {
-  background: "#fff", color: "#374151", border: "1px dashed #9ca3af",
-  borderRadius: 999, padding: "4px 12px", fontSize: 13, cursor: "pointer",
 };

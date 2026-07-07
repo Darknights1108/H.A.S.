@@ -24,6 +24,22 @@ logger = logging.getLogger(__name__)
 RULES_VERSION = "rules-v1"
 
 
+# 专业名称归一化:缩写与全称互认(老职位存的是 CS/SE 短码,新表单发全称)
+_FIELD_ALIASES = {
+    "cs": "computer science",
+    "se": "software engineering",
+    "is": "information systems",
+    "it": "information technology",
+    "ds": "data science",
+    "hr": "human resources",
+}
+
+
+def _canon_field(x: str | None) -> str:
+    low = (x or "").strip().lower()
+    return _FIELD_ALIASES.get(low, low)
+
+
 def _knockout_checks(app_: Application, ko: dict) -> dict[str, dict]:
     """逐项硬门槛检查,返回 {项: {passed, detail}}。"""
     checks: dict[str, dict] = {}
@@ -34,7 +50,8 @@ def _knockout_checks(app_: Application, ko: dict) -> dict[str, dict]:
             "detail": f"CGPA {app_.cgpa} vs required ≥ {ko['min_cgpa']}",
         }
     if ko.get("fields"):
-        passed = app_.degree_field in ko["fields"]
+        accepted = {_canon_field(f) for f in ko["fields"]}
+        passed = _canon_field(app_.degree_field) in accepted
         checks["degree_field"] = {
             "passed": passed,
             "detail": f"field '{app_.degree_field}' vs accepted {ko['fields']}",

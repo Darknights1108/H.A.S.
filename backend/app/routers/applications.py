@@ -85,6 +85,43 @@ def suggest_skills(resume: UploadFile = File(...)) -> dict:
     return {"skills": skills[:30], "model": model}
 
 
+# ---------- scoring helpers ----------
+
+KNOWN_LANGS = ["Python", "PHP", "Java", "JavaScript", "TypeScript", "C++", "C#", "C",
+               "Go", "Golang", "Ruby", "Swift", "Kotlin", "R", "Rust", "Scala", "MATLAB"]
+AI_KEYWORDS = ["ai", "machine learning", "deep learning", "nlp", "llm", "neural",
+               "computer vision", "scikit", "tensorflow", "pytorch", "langchain",
+               "rag", "genai", "generative", "data science"]
+
+
+def _derive_scoring_flags(skills: list[str]) -> tuple[list[str], bool, bool]:
+    """从技能列表推导打分要素:编程语言 / SQL / AI。"""
+    low = [x.lower() for x in skills]
+    langs: list[str] = []
+    for lang in KNOWN_LANGS:
+        ll = lang.lower()
+        if any(l == ll or ll in l.split() for l in low):
+            canonical = "Go" if lang == "Golang" else lang
+            if canonical not in langs:
+                langs.append(canonical)
+    has_sql = any("sql" in l for l in low)
+    has_ai = any(k in l for l in low for k in AI_KEYWORDS)
+    return langs, has_sql, has_ai
+
+
+def _score_and_route(db: Session, app_: Application, candidate: Candidate, job: Job) -> None:
+    """打分并分流:Low → 拒 + 婉拒信;否则进 shortlist。"""
+    score = score_application(db, app_)
+    if score.band == "low":
+        app_.status = "rejected"
+        app_.rejected_reason = "low_band"
+        subject, body = rejection_email(db, candidate, job, after_interview=False)
+        draft_email(db, app_, "reject", subject, body)
+    else:
+        app_.status = "shortlisted"
+        app_.shortlisted_at = datetime.datetime.now(datetime.timezone.utc)
+
+
 # ---------- public submission(multipart:表单字段 + 可选简历文件)----------
 
 class ApplicationIn(BaseModel):
@@ -119,6 +156,8 @@ def submit_application(
     eca: str | None = Form(None),
     consent_talent_bank: bool = Form(False),
     # 可选补充信息(仅存 form_data,不参与打分)
+    education_level: str | None = Form(None),
+    institution: str | None = Form(None),
     skills: str = Form("[]"),               # JSON array string
     preferred_start_date: str | None = Form(None),
     salary_expectation: str | None = Form(None),
@@ -195,6 +234,8 @@ def submit_application(
         form_data={
             **payload.model_dump(mode="json"),
             "skills": skill_list,
+            "education_level": education_level,
+            "institution": institution,
             "preferred_start_date": preferred_start_date,
             "salary_expectation": salary_expectation,
             "heard_about_us": heard_about_us,
@@ -214,22 +255,66 @@ def submit_application(
         app_.resume_file_url = key
         app_.resume_parse_status = "pending"
 
-    # 提交即打分分流(表单为主数据源,与简历解析解耦)
-    score = score_application(db, app_)
-    if score.band == "low":
-        app_.status = "rejected"
-        app_.rejected_reason = "low_band"
-        subject, body = rejection_email(db, candidate, job, after_interview=False)
-        draft_email(db, app_, "reject", subject, body)
-    else:
-        app_.status = "shortlisted"
-        app_.shortlisted_at = datetime.datetime.now(datetime.timezone.utc)
-
+    # 打分推迟到 Skill Assessment 完成时(编程语言/SQL/AI 从技能列表推导)
     db.commit()
     if resume_data is not None:
         parse_resume_async(app_.id)  # 后台 LLM 解析,不阻塞提交
-    # 对候选人只返回"已收到",不暴露打分结果
-    return {"application_id": str(app_.id), "message": "Application received. We will be in touch."}
+    return {
+        "application_id": str(app_.id),
+        "skill_token": str(app_.booking_token),
+        "message": "Application received. One more step: tell us your skills.",
+    }
+
+
+# ---------- skill assessment(提交后的第二步,公开凭 token)----------
+
+@router.get("/skill-assessment/{token}")
+def get_skill_assessment(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
+    app_ = db.scalar(select(Application).where(Application.booking_token == token))
+    if app_ is None:
+        raise HTTPException(404, "not found")
+    job = db.get(Job, app_.job_id)
+    criteria = (job.requirements or {}).get("criteria") or {}
+    job_skills = list((criteria.get("must_have") or [])) + list((criteria.get("nice_to_have") or []))
+    resume_skills: list[str] = []
+    if app_.resume_parse_status == "done" and app_.resume_parsed:
+        resume_skills = list(app_.resume_parsed.get("programming_languages") or []) +                         list(app_.resume_parsed.get("other_skills") or [])
+    return {
+        "job_title": job.title,
+        "done": app_.status != "applied",
+        "current_skills": (app_.form_data or {}).get("skills") or [],
+        "job_skills": job_skills[:20],
+        "resume_skills": resume_skills[:30],
+        "resume_parse_status": app_.resume_parse_status,
+    }
+
+
+class SkillsIn(BaseModel):
+    skills: list[str] = []
+
+
+@router.post("/skill-assessment/{token}")
+def submit_skill_assessment(token: uuid.UUID, payload: SkillsIn,
+                            db: Session = Depends(get_db)) -> dict:
+    """完成技能评估:存技能 → 推导打分要素 → 打分分流。每份申请只能提交一次。"""
+    app_ = db.scalar(select(Application).where(Application.booking_token == token))
+    if app_ is None:
+        raise HTTPException(404, "not found")
+    if app_.status != "applied":
+        raise HTTPException(409, "skill assessment already completed")
+
+    skills = [str(x).strip()[:60] for x in payload.skills if str(x).strip()][:50]
+    langs, has_sql, has_ai = _derive_scoring_flags(skills)
+    app_.form_data = {**(app_.form_data or {}), "skills": skills}
+    app_.prog_langs = langs
+    app_.has_sql = has_sql
+    app_.has_ai_study = has_ai
+
+    candidate = db.get(Candidate, app_.candidate_id)
+    job = db.get(Job, app_.job_id)
+    _score_and_route(db, app_, candidate, job)
+    db.commit()
+    return {"message": "Application complete. We will be in touch soon."}
 
 
 # ---------- admin review ----------
