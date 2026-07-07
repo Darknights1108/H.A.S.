@@ -76,8 +76,9 @@ npm run dev
   - Pass → application=passed + offer 信草稿;Fail → rejected(interview_failed)+ 婉拒信草稿(留 talent bank)
   - 草稿进 Outbox 人工审核发送;pipeline 全链路闭环
 - [x] Analytics `/admin/analytics`:总览卡片、招聘漏斗、band 分布、淘汰原因、各职位统计、近14天趋势、时段利用率、面试官负载
-- [x] 认证:Magic Link(免密码)+ 邮箱白名单 + Session Cookie(详见 `docs/auth-magic-link.md`)
-  - 登录页 `/login`;白名单管理 `/admin/allowlist`(角色/启停/审计)
+- [x] 认证:Email OTP(免密码,6 位验证码)+ 邮箱白名单 + Session Cookie(详见 `docs/auth-email-otp.md`)
+  - 两步登录 `/login`(Send Code → Verify);验证码哈希存储、10 分钟过期、单次使用、5 次错误锁定
+  - 白名单管理 `/admin/allowlist`(角色/启停/审计)
   - 面试官登入后只能以自己身份认领时段;admin 才能进审查/职位/邮件页
   - 首个 admin 由 `ADMIN_EMAIL` 环境变量启动时写入
 - [x] 双 timer:无人审(未发邀请)/ 候选人无响应(邀请发出 N 天未预约),互不误伤,天数均可配

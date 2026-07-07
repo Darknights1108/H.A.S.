@@ -1,20 +1,25 @@
-"""Magic-link 登录 + 白名单管理 API。
+"""Email OTP 登录 + 白名单管理 API(免密码)。
 
-登录流:
-  POST /auth/request-link  输入邮箱 → 白名单+限流校验 → 发一次性链接(统一泛化回复,不泄露是否在册)
-  POST /auth/verify        校验令牌(未过期/未用过/邮箱仍 enabled)→ 标记已用 → 建会话 → 种 cookie
+登录流(两步):
+  POST /auth/request-otp   输入邮箱 → 白名单+限流校验 → 邮件发 6 位验证码
+                           (统一泛化回复,不泄露邮箱是否在册)
+  POST /auth/verify-otp    邮箱+验证码 → 校验(未过期/未用过/尝试次数未超限)
+                           → 码立即作废 → 建会话 → 种 HttpOnly cookie
   GET  /auth/me            当前会话信息
   POST /auth/logout        吊销会话 + 清 cookie
 
-白名单(admin):GET/POST /auth/allowlist,PATCH/DELETE /auth/allowlist/{id}
+安全:验证码只存 SHA-256 哈希(加邮箱盐);有效期 otp_ttl_minutes(默认 10 分钟);
+单次使用;每码最多 otp_max_attempts 次失败尝试;请求限流 3/邮箱 + 10/IP 每 15 分钟。
+白名单(admin):GET/POST /auth/allowlist,PATCH/DELETE /auth/allowlist/{id}。
 所有关键动作写入 auth_log。
 """
 
 import datetime
+import secrets
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -35,7 +40,8 @@ from ..services.mailer import send_raw
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-GENERIC_MSG = "Please check your email. If this email is allowed, a login link will be sent."
+GENERIC_MSG = "If this email is allowed, a verification code has been sent. Check your inbox."
+INVALID_MSG = "Invalid or expired code. Please check the code or request a new one."
 ROLES = ("admin", "interviewer", "lecturer", "supervisor", "user")
 # 限流窗口:同邮箱 15 分钟最多 3 次;同 IP 15 分钟最多 10 次
 RATE_WINDOW_MIN = 15
@@ -43,12 +49,21 @@ RATE_MAX_PER_EMAIL = 3
 RATE_MAX_PER_IP = 10
 
 
-class RequestLinkIn(BaseModel):
+def _new_otp() -> str:
+    return f"{secrets.randbelow(10**6):06d}"
+
+
+def _otp_hash(email: str, code: str) -> str:
+    # 用邮箱作盐,防止彩虹表/跨用户比对
+    return hash_token(f"{email}:{code}")
+
+
+class RequestOtpIn(BaseModel):
     email: EmailStr
 
 
-@router.post("/request-link")
-def request_link(payload: RequestLinkIn, request: Request, db: Session = Depends(get_db)) -> dict:
+@router.post("/request-otp")
+def request_otp(payload: RequestOtpIn, request: Request, db: Session = Depends(get_db)) -> dict:
     email = payload.email.lower().strip()
     ip = request.client.host if request.client else None
     since = utcnow() - datetime.timedelta(minutes=RATE_WINDOW_MIN)
@@ -63,7 +78,7 @@ def request_link(payload: RequestLinkIn, request: Request, db: Session = Depends
     entry = db.scalar(select(AllowedEmail).where(AllowedEmail.email == email))
     if entry is None or not entry.enabled:
         # 不发送、不泄露;仅记审计
-        log_auth(db, "magic_link_denied", email, ip,
+        log_auth(db, "otp_denied", email, ip,
                  "not in allowlist" if entry is None else "disabled")
         return generic()
 
@@ -79,57 +94,74 @@ def request_link(payload: RequestLinkIn, request: Request, db: Session = Depends
             .where(LoginToken.request_ip == ip, LoginToken.created_at > since)
         ) or 0
     if n_email >= RATE_MAX_PER_EMAIL or n_ip >= RATE_MAX_PER_IP:
-        log_auth(db, "magic_link_rate_limited", email, ip,
+        log_auth(db, "otp_rate_limited", email, ip,
                  f"email:{n_email} ip:{n_ip} in {RATE_WINDOW_MIN}min")
         return generic()
 
-    raw = new_raw_token()
+    code = _new_otp()
     db.add(LoginToken(
         email=email,
-        token_hash=hash_token(raw),
+        token_hash=_otp_hash(email, code),
         request_ip=ip,
-        expires_at=utcnow() + datetime.timedelta(minutes=settings.magic_link_ttl_minutes),
+        expires_at=utcnow() + datetime.timedelta(minutes=settings.otp_ttl_minutes),
     ))
-    link = f"{settings.frontend_base_url}/auth/verify?token={raw}"
     try:
         send_raw(
             email,
-            "Your HAS login link",
+            f"{code} is your HAS verification code",
             (
                 f"Hi{f' {entry.name}' if entry.name else ''},\n\n"
-                f"Click the link below to sign in to HAS. "
-                f"It expires in {settings.magic_link_ttl_minutes} minutes and can be used once.\n\n"
-                f"{link}\n\n"
+                f"Your one-time sign-in code is:\n\n"
+                f"    {code}\n\n"
+                f"Enter it on the login page to sign in. The code expires in "
+                f"{settings.otp_ttl_minutes} minutes and can be used once.\n\n"
                 f"If you did not request this, you can safely ignore this email.\n"
             ),
         )
-        log_auth(db, "magic_link_requested", email, ip)
+        log_auth(db, "otp_requested", email, ip)
     except Exception as e:
-        log_auth(db, "magic_link_send_failed", email, ip, str(e))
-    # 开发模式可直接回传链接,便于本地/自动化测试;生产必须关闭
-    return generic({"debug_link": link} if settings.debug_expose_magic_link else None)
+        log_auth(db, "otp_send_failed", email, ip, str(e))
+    # 开发模式可直接回传验证码,便于本地/自动化测试;生产必须关闭
+    return generic({"debug_code": code} if settings.debug_expose_otp else None)
 
 
-class VerifyIn(BaseModel):
-    token: str
+class VerifyOtpIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=4, max_length=10)
 
 
-@router.post("/verify")
-def verify(payload: VerifyIn, request: Request, response: Response,
-           db: Session = Depends(get_db)) -> dict:
+@router.post("/verify-otp")
+def verify_otp(payload: VerifyOtpIn, request: Request, response: Response,
+               db: Session = Depends(get_db)) -> dict:
+    email = payload.email.lower().strip()
+    code = payload.code.strip()
     ip = request.client.host if request.client else None
-    row = db.scalar(select(LoginToken).where(LoginToken.token_hash == hash_token(payload.token)))
-    if row is None or row.used_at is not None or row.expires_at < utcnow():
-        log_auth(db, "token_invalid", row.email if row else None, ip,
-                 "used" if row and row.used_at else "expired-or-unknown")
-        db.commit()
-        raise HTTPException(401, "This login link is invalid or has expired. Please request a new one.")
 
-    entry = db.scalar(select(AllowedEmail).where(AllowedEmail.email == row.email))
-    if entry is None or not entry.enabled:
-        log_auth(db, "token_invalid", row.email, ip, "email no longer allowed")
+    # 只认该邮箱最新一条未使用的码(申请新码即自动作废旧码)
+    row = db.scalar(
+        select(LoginToken)
+        .where(LoginToken.email == email, LoginToken.used_at.is_(None))
+        .order_by(LoginToken.created_at.desc())
+    )
+    if row is None or row.expires_at < utcnow():
+        log_auth(db, "otp_invalid", email, ip, "expired-or-none")
         db.commit()
-        raise HTTPException(401, "This login link is invalid or has expired. Please request a new one.")
+        raise HTTPException(401, INVALID_MSG)
+    if row.attempts >= settings.otp_max_attempts:
+        log_auth(db, "otp_locked", email, ip, f"attempts={row.attempts}")
+        db.commit()
+        raise HTTPException(429, "Too many attempts. Please request a new code.")
+    if row.token_hash != _otp_hash(email, code):
+        row.attempts += 1
+        log_auth(db, "otp_invalid", email, ip, f"wrong code (attempt {row.attempts})")
+        db.commit()
+        raise HTTPException(401, INVALID_MSG)
+
+    entry = db.scalar(select(AllowedEmail).where(AllowedEmail.email == email))
+    if entry is None or not entry.enabled:
+        log_auth(db, "otp_invalid", email, ip, "email no longer allowed")
+        db.commit()
+        raise HTTPException(401, INVALID_MSG)
 
     row.used_at = utcnow()                      # 单次使用:立即失效
     if entry.verified_at is None:

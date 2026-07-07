@@ -158,6 +158,7 @@ class LoginToken(Base):
     request_ip: Mapped[str | None] = mapped_column(Text)
     expires_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime.datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     created_at: Mapped[datetime.datetime] = _now()
 
 

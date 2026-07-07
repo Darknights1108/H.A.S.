@@ -20,10 +20,11 @@ class Settings(BaseSettings):
     smtp_from: str | None = None  # 形如 "HAS Recruitment <me@gmail.com>"
     # 认证(magic link + session cookie)
     admin_email: str | None = None       # 启动时自动写入白名单的初始 admin
-    magic_link_ttl_minutes: int = 15     # 登录链接有效期
+    otp_ttl_minutes: int = 10            # OTP 验证码有效期(5-10 分钟)
+    otp_max_attempts: int = 5            # 单个验证码最多验证失败次数
     session_ttl_days: int = 7            # 会话有效期
     cookie_secure: bool = False          # 生产 HTTPS 环境置 true
-    debug_expose_magic_link: bool = False  # 仅开发:request-link 响应直接带链接
+    debug_expose_otp: bool = False       # 仅开发:request-otp 响应直接带验证码
     # 对象存储(简历文件)
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "has"

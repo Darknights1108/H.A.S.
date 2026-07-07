@@ -42,9 +42,9 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-ansonangzhenloong@gmail.com}
-      # 调试用:request-link 响应直接带链接(跳过读邮箱)。默认关闭 = 真实邮件流程;
-      # 跑自动化测试时可在 .env 设 DEBUG_EXPOSE_MAGIC_LINK=true 临时打开
-      DEBUG_EXPOSE_MAGIC_LINK: ${DEBUG_EXPOSE_MAGIC_LINK:-false}
+      # 调试用:request-otp 响应直接带验证码(跳过读邮箱)。默认关闭 = 真实邮件流程;
+      # 跑自动化测试时可在 .env 设 DEBUG_EXPOSE_OTP=true 临时打开
+      DEBUG_EXPOSE_OTP: ${DEBUG_EXPOSE_OTP:-false}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: has
       MINIO_SECRET_KEY: hasminio123
