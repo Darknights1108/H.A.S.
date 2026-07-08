@@ -15,8 +15,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # login_token 从存 magic-link 令牌哈希改为存 OTP 码哈希;
-    # attempts 记录验证失败次数(达到上限即锁定该码)
+    # login_token now stores OTP code hashes instead of magic-link token hashes;
+    # attempts counts failed verifications (the code locks at the cap)
     op.execute("ALTER TABLE login_token ADD COLUMN attempts int NOT NULL DEFAULT 0")
 
 

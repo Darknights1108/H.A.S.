@@ -1,6 +1,6 @@
-"""打分引擎:硬门槛(knockout)+ 加分项(bonus)→ band。
+"""Scoring engine: knockout (hard requirements) + bonus points -> band.
 
-规则来自 job.requirements(jsonb),例:
+Rules come from job.requirements (jsonb), e.g.:
 {
   "knockout": { "min_cgpa": 3.20, "fields": ["CS","SE","IS","IT","Data Science"],
                 "require_fulltime": true, "langs_any": ["Python","PHP"], "require_sql": true },
@@ -8,8 +8,8 @@
   "high_min_bonus": 15
 }
 
-任一硬门槛不过 → Low;全过 → 按加分总分定 High(≥ high_min_bonus)/ Medium。
-理由(reasoning):有 ANTHROPIC_API_KEY 时用 Claude 润色,否则规则模板生成。
+Fail any knockout -> Low; pass all -> High (bonus >= high_min_bonus) or Medium.
+Reasoning is polished by the LLM when a key is configured, else template-generated.
 """
 
 import logging
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 RULES_VERSION = "rules-v1"
 
 
-# 专业名称归一化:缩写与全称互认(老职位存的是 CS/SE 短码,新表单发全称)
+# Degree-field canonicalisation: short codes and full names match (legacy jobs store CS/SE codes, the new form sends full names)
 _FIELD_ALIASES = {
     "cs": "computer science",
     "se": "software engineering",
@@ -41,7 +41,7 @@ def _canon_field(x: str | None) -> str:
 
 
 def _knockout_checks(app_: Application, ko: dict) -> dict[str, dict]:
-    """逐项硬门槛检查,返回 {项: {passed, detail}}。"""
+    """Per-item knockout checks; returns {item: {passed, detail}}."""
     checks: dict[str, dict] = {}
     if "min_cgpa" in ko:
         passed = app_.cgpa is not None and float(app_.cgpa) >= float(ko["min_cgpa"])
@@ -104,7 +104,7 @@ def _template_reasoning(
 
 
 def _llm_reasoning(template: str, band: str) -> tuple[str, str] | None:
-    """有 LLM key 时把规则结果润色成简洁评审说明,返回 (文本, 模型);失败返回 None 走模板。"""
+    """With an LLM key, polish the rule result into a concise reviewer note; returns (text, model), or None to fall back to the template."""
     return llm.complete_text(
         "You are a hiring screening assistant. Rewrite the following "
         "rule-based screening result as a concise, neutral 2-4 sentence "
@@ -114,7 +114,7 @@ def _llm_reasoning(template: str, band: str) -> tuple[str, str] | None:
 
 
 def score_application(db: Session, app_: Application) -> Score:
-    """打分并写 score 行(不 commit);调用方负责状态流转与 commit。"""
+    """Score and add the score row (no commit); caller handles status transitions and commit."""
     job = db.get(Job, app_.job_id)
     req = job.requirements or {}
     knockout = _knockout_checks(app_, req.get("knockout", {}))

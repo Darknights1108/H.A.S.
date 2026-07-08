@@ -1,8 +1,8 @@
-"""候选人端预约 API(免登录,凭 application.booking_token)。
+"""Candidate booking API (no login; authorised by application.booking_token).
 
-状态流:
-  选时段(hold,可自由撤回改选)→ 确认(生成 interview + 确认信草稿)→ 之后改时间走 reschedule(限次)
-并发:所有改动 slot 的操作先 SELECT ... FOR UPDATE 行锁,再校验状态。
+State flow:
+  pick a slot (hold; free to withdraw/re-pick) -> confirm (creates the interview + confirmation email) -> later changes go through reschedule
+Concurrency: every slot mutation takes a SELECT ... FOR UPDATE row lock before validating state.
 """
 
 import datetime
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 def _notify_panel(db: Session, slot: Slot, candidate: Candidate,
                   meeting_link: str | None, rescheduled: bool) -> int:
-    """通知该时段的 panel 面试官有新预约;尽力发送,失败不影响预约流程。"""
+    """Notify the slot's panel interviewers about the booking; best-effort, never blocks the flow."""
     emails = db.scalars(
         select(Interviewer.email)
         .join(SlotInterviewer, SlotInterviewer.interviewer_id == Interviewer.id)
@@ -110,7 +110,7 @@ def get_booking(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
             .where(Slot.status == "open", Slot.slot_date >= today)
             .order_by(Slot.slot_date, Slot.start_time)
         )
-        if s.slot_date.weekday() < 5  # 面试只在工作日(周一至五)
+        if s.slot_date.weekday() < 5  # interviews on working days only (Mon-Fri)
     ]
     return {
         "candidate": {"name": candidate.name, "email": candidate.email, "phone": candidate.phone},
@@ -121,7 +121,7 @@ def get_booking(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
             {
                 "meeting_link": interview.meeting_link,
                 "reschedule_count": interview.reschedule_count,
-                "reschedule_max": get_setting_int(db, "reschedule_max", 0),  # 0 = 不限次
+                "reschedule_max": get_setting_int(db, "reschedule_max", 0),  # 0 = unlimited
             }
             if interview
             else None
@@ -136,7 +136,7 @@ class SelectIn(BaseModel):
 
 
 def _book_slot(db: Session, app_: Application, slot_id: uuid.UUID) -> Slot:
-    """行锁 + 校验 + 落定预订;调用方负责 commit。返回新预订的 slot。"""
+    """Row-lock + validate + book; caller commits. Returns the newly booked slot."""
     slot = db.execute(
         select(Slot).where(Slot.id == slot_id).with_for_update()
     ).scalar_one_or_none()
@@ -144,7 +144,7 @@ def _book_slot(db: Session, app_: Application, slot_id: uuid.UUID) -> Slot:
         raise HTTPException(404, "slot not found")
     if slot.status != "open":
         raise HTTPException(409, "slot no longer available, please pick another")
-    # 释放该候选人已持有的时段(撤回改选)
+    # release the slot this candidate already holds (withdraw & re-pick)
     prev = _held_slot(db, app_.candidate_id, for_update=True)
     if prev is not None:
         release_slot(db, prev)
@@ -180,7 +180,7 @@ def withdraw(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
 
 
 class ConfirmIn(BaseModel):
-    """候选人在确认时填写/修正的联系资料(Bookings 式 Add your details)。"""
+    """Contact details the candidate fills/corrects at confirmation (Bookings-style 'Add your details')."""
 
     name: str | None = None
     email: EmailStr | None = None
@@ -198,7 +198,7 @@ def confirm(
     if held is None:
         raise HTTPException(409, "select a slot first")
     candidate = db.get(Candidate, app_.candidate_id)
-    # 更新候选人资料(email 变更需查重,它是身份键)
+    # Update candidate details (email changes need a uniqueness check — it's the identity key)
     if payload:
         if payload.email and payload.email != candidate.email:
             taken = db.scalar(
@@ -213,7 +213,7 @@ def confirm(
             candidate.name = payload.name.strip()
         if payload.phone is not None:
             candidate.phone = payload.phone.strip() or None
-    # 占位会议链接;后续接 Google Meet / Teams 时替换
+    # placeholder meeting link; swap for Google Meet / Teams later
     meeting_link = f"https://meet.jit.si/HAS-{app_.booking_token}"
     interview = Interview(
         application_id=app_.id,
@@ -227,7 +227,7 @@ def confirm(
     subject, body = confirmation_email_body(db, candidate, held, meeting_link, rescheduled=False)
     email = draft_email(db, app_, "confirmation", subject, body)
     db.flush()
-    try_send_draft(db, email)  # 纯事实性内容,自动发送;失败保留草稿可人工重发
+    try_send_draft(db, email)  # factual content, auto-send; failure keeps the draft for manual re-send
     db.commit()
     notified = _notify_panel(db, held, candidate, meeting_link, rescheduled=False)
     return {
@@ -248,10 +248,10 @@ def reschedule(token: uuid.UUID, payload: RescheduleIn, db: Session = Depends(ge
     interview = _active_interview(db, app_.id)
     if interview is None:
         raise HTTPException(409, "no confirmed interview to reschedule")
-    max_ = get_setting_int(db, "reschedule_max", 0)  # 0 = 不限次
+    max_ = get_setting_int(db, "reschedule_max", 0)  # 0 = unlimited
     if max_ > 0 and interview.reschedule_count >= max_:
         raise HTTPException(409, f"reschedule limit reached ({max_})")
-    slot = _book_slot(db, app_, payload.slot_id)  # 内部会释放旧时段
+    slot = _book_slot(db, app_, payload.slot_id)  # releases the old slot internally
     interview.slot_id = slot.id
     interview.reschedule_count += 1
     candidate = db.get(Candidate, app_.candidate_id)
@@ -260,7 +260,7 @@ def reschedule(token: uuid.UUID, payload: RescheduleIn, db: Session = Depends(ge
     )
     email = draft_email(db, app_, "reschedule", subject, body)
     db.flush()
-    try_send_draft(db, email)  # 同确认信:自动发送,失败保留草稿
+    try_send_draft(db, email)  # same as the confirmation email: auto-send, failure keeps the draft
     db.commit()
     notified = _notify_panel(db, slot, candidate, interview.meeting_link, rescheduled=True)
     return {

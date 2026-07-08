@@ -67,7 +67,7 @@ export default function ApplyPage() {
 
   const selectedJob = jobs.find((j) => j.id === form.job_id);
 
-  // 选中简历后立即 AI 提取技能,暂存给下一步 Skill Assessment 页
+  // on resume pick, extract skills via AI right away and stash them for the Skill Assessment step
   async function onResumePicked(file: File | null) {
     setResume(file);
     setDetected(null);
@@ -119,7 +119,7 @@ export default function ApplyPage() {
           : data.detail;
         throw new Error(detail ?? `HTTP ${r.status}`);
       }
-      // 进入第二步:Skill Assessment
+      // proceed to step 2: Skill Assessment
       window.location.href = `/apply/skills?token=${data.skill_token}`;
     } catch (e) {
       setError(String(e));

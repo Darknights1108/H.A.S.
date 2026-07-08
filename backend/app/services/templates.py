@@ -1,11 +1,10 @@
-"""候选人信件模板(统一措辞;公司名读 app_setting.company_name)。
+"""Candidate letter templates (consistent wording; company name from
+app_setting.company_name).
 
-reject 模板按用户提供的范本(Infineon 风格):
-  We have carefully reviewed ... regret to inform you ...
-  (可选 talent bank 段)
-  We wish you good luck ...
-  Best Regards, {company} Recruiting Team
-offer 模板为占位版本 —— 具体 offer letter 内容待定,结构先立起来。
+The rejection template follows the sample supplied by the user (corporate
+style): "We have carefully reviewed ... regret to inform you ..." with an
+optional talent-bank paragraph, closed by "Best Regards, {company} Recruiting
+Team". The offer template is a placeholder — final wording TBD.
 """
 
 from sqlalchemy.orm import Session
@@ -25,7 +24,7 @@ def get_company_name(db: Session, default: str = "HAS") -> str:
 
 
 def _render(template: str, mapping: dict[str, str]) -> str:
-    """逐个替换占位符;未知的 {xxx} 原样保留,不会崩。"""
+    """Replace placeholders one by one; unknown {xxx} stay as-is, never crash."""
     for k, v in mapping.items():
         template = template.replace("{" + k + "}", str(v))
     return template
@@ -45,7 +44,7 @@ DEFAULT_INVITE_BODY = (
 def invite_email(
     db: Session, candidate: Candidate, job: Job, booking_url: str
 ) -> tuple[str, str]:
-    """邀请信:主题/正文模板均可在 admin settings 编辑。"""
+    """Invite email: subject/body templates are editable in admin settings."""
     mapping = {
         "candidate_name": candidate.name,
         "job_title": job.title,
@@ -87,7 +86,7 @@ def rejection_email(
 def offer_email(db: Session, candidate: Candidate, job: Job) -> tuple[str, str]:
     company = get_company_name(db)
     subject = f"Offer — {job.title}"
-    # 占位版 offer letter:正式内容待定,先保证流程与签名结构完整
+    # Placeholder offer letter: final wording TBD; flow and signature structure in place
     body = (
         f"Dear {candidate.name},\n\n"
         f"Congratulations! Following your interview, we are pleased to offer "

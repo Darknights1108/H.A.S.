@@ -1,4 +1,4 @@
-"""Analytics API:招聘漏斗与运营指标聚合 + Excel 导出(admin)。"""
+"""Analytics API: hiring funnel and operational aggregates + Excel export (admin)."""
 
 import datetime
 import io
@@ -25,7 +25,7 @@ from ..models import (
 
 
 def _analytics_payload(db: Session) -> dict:
-    """聚合逻辑供 JSON 端点与 Excel 导出共用。"""
+    """Aggregation shared by the JSON endpoint and the Excel export."""
     return _compute_analytics(db)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -69,7 +69,7 @@ def _compute_analytics(db: Session) -> dict:
     ) or 0
     passed = status_counts.get("passed", 0)
 
-    # 漏斗:各阶段"到达过"的申请数(累进)
+    # Funnel: cumulative count of applications that reached each stage
     screened_ok = (band_counts.get("high", 0) or 0) + (band_counts.get("medium", 0) or 0)
     funnel = [
         {"stage": "Applications received", "count": total_apps},
@@ -131,7 +131,7 @@ def _compute_analytics(db: Session) -> dict:
         ).all()
     ]
 
-    # 提交到预约的平均天数
+    # Average days from submission to booking
     avg_secs = db.scalar(
         select(func.avg(func.extract("epoch", Interview.created_at - Application.submitted_at)))
         .select_from(Interview)
@@ -162,12 +162,12 @@ def _compute_analytics(db: Session) -> dict:
     }
 
 
-# ---------- Excel 导出 ----------
+# ---------- Excel export ----------
 
 @router.get("/export")
 def export_excel(db: Session = Depends(get_db),
                  _admin: UserSession = Depends(require_admin)) -> StreamingResponse:
-    """汇总指标 + 原始明细导出为多 sheet 的 .xlsx,供外部分析。"""
+    """Export aggregates + raw detail as a multi-sheet .xlsx for external analysis."""
     from openpyxl import Workbook
     from openpyxl.styles import Font
 
@@ -182,7 +182,7 @@ def export_excel(db: Session = Depends(get_db),
             cell.font = bold
         for row in rows:
             ws.append(row)
-        # 简单列宽自适应
+        # simple column-width auto-fit
         for col in ws.columns:
             width = max((len(str(c.value)) for c in col if c.value is not None), default=8)
             ws.column_dimensions[col[0].column_letter].width = min(width + 2, 50)
@@ -212,7 +212,7 @@ def export_excel(db: Session = Depends(get_db),
     sheet("Daily applications", ["Date", "Count"],
           [[d["date"], d["count"]] for d in a["daily_applications"]])
 
-    # Applications 原始明细
+    # Applications raw detail
     app_rows = db.execute(
         select(Application, Candidate, Job, Score)
         .join(Candidate, Candidate.id == Application.candidate_id)
@@ -251,7 +251,7 @@ def export_excel(db: Session = Depends(get_db),
         "Resume", "Preferred start", "Salary expectation", "Source",
     ], rows)
 
-    # Interviews 明细
+    # Interviews detail
     itv_rows = db.execute(
         select(Interview, Slot, Application, Candidate, Job)
         .join(Slot, Slot.id == Interview.slot_id)

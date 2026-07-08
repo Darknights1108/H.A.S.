@@ -15,7 +15,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 白名单:只有在册且 enabled 的邮箱才能收到 magic link
+    # Allowlist: only enabled, listed emails can receive a login credential
     op.execute(
         """
         CREATE TABLE allowed_email (
@@ -25,13 +25,13 @@ def upgrade() -> None:
             role        text        NOT NULL DEFAULT 'user'
                         CHECK (role IN ('admin','interviewer','lecturer','supervisor','user')),
             enabled     boolean     NOT NULL DEFAULT true,
-            added_by    citext,                        -- 添加者(admin 邮箱);bootstrap 为系统
+            added_by    citext,                        -- who added it (admin email); 'bootstrap' means the system
             added_at    timestamptz NOT NULL DEFAULT now(),
-            verified_at timestamptz                    -- 首次成功登录(邮箱所有权已验证)
+            verified_at timestamptz                    -- first successful login (email ownership verified)
         )
         """
     )
-    # 一次性登录令牌:只存 sha256 哈希,短时效,单次使用
+    # One-time login tokens: sha256 hash only, short-lived, single-use
     op.execute(
         """
         CREATE TABLE login_token (
@@ -47,7 +47,7 @@ def upgrade() -> None:
     )
     op.execute("CREATE INDEX idx_login_token_email_created ON login_token(email, created_at)")
     op.execute("CREATE INDEX idx_login_token_ip_created ON login_token(request_ip, created_at)")
-    # 服务端会话:cookie 只存随机值,库里存哈希,可随时吊销
+    # Server-side sessions: the cookie holds a random value, the DB its hash; revocable anytime
     op.execute(
         """
         CREATE TABLE user_session (
@@ -62,7 +62,7 @@ def upgrade() -> None:
         """
     )
     op.execute("CREATE INDEX idx_user_session_email ON user_session(email)")
-    # 审计日志:登录请求/成功/失败、白名单变更
+    # Audit log: login requests/successes/failures, allowlist changes
     op.execute(
         """
         CREATE TABLE auth_log (

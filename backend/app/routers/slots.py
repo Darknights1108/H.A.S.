@@ -1,7 +1,7 @@
-"""排期 API:面试官管理、时段网格生成、认领/撤回。
+"""Scheduling API: interviewer management, slot-grid generation, claim/withdraw.
 
-认证:登录会话(cookie)。generate/面试官创建 = admin;认领/撤回 = 任何 staff,
-非 admin 的身份强制取自会话邮箱(不能替别人认领);admin 需显式指定 interviewer_id。
+Auth: login session (cookie). generate / interviewer creation = admin; claim/withdraw = any staff;
+non-admin identity is forced to the session email (cannot claim for others); admin must pass interviewer_id explicitly.
 """
 
 import datetime
@@ -22,7 +22,7 @@ from ..services.scheduling import get_setting_int, recompute_unbooked_status
 def _acting_interviewer_id(
     db: Session, sess: UserSession, requested: uuid.UUID | None
 ) -> uuid.UUID:
-    """确定操作身份:非 admin 强制为本人;admin 必须显式指定。"""
+    """Resolve the acting identity: non-admin is forced to self; admin must specify explicitly."""
     if sess.role != "admin":
         return resolve_interviewer(db, sess.email).id
     if requested is None:
@@ -63,18 +63,18 @@ def list_interviewers(db: Session = Depends(get_db),
 
 class GenerateSlotsIn(BaseModel):
     start_date: datetime.date
-    end_date: datetime.date          # 含当天
-    start_hour: int | None = None    # 缺省读 app_setting.work_start_hour
-    end_hour: int | None = None      # 缺省读 app_setting.work_end_hour
+    end_date: datetime.date          # inclusive
+    start_hour: int | None = None    # defaults to app_setting.work_start_hour
+    end_hour: int | None = None      # defaults to app_setting.work_end_hour
     skip_weekends: bool = True
 
 
 @router.post("/generate", status_code=201)
 def generate_slots(payload: GenerateSlotsIn, db: Session = Depends(get_db),
                    _admin: UserSession = Depends(require_admin)) -> dict:
-    """按固定时长生成 empty 时段网格;已存在的(同日期同起点)跳过。
+    """Generate a grid of empty fixed-length slots; existing ones (same date + start) are skipped.
 
-    工作时间范围默认取设置(work_start_hour / work_end_hour),请求可显式覆盖。
+    Working hours default to the settings (work_start_hour / work_end_hour); the request can override.
     """
     if payload.end_date < payload.start_date:
         raise HTTPException(422, "end_date must be >= start_date")
@@ -164,7 +164,7 @@ def list_slots(
 # ---------- bulk claim / withdraw ----------
 
 class BulkClaimIn(BaseModel):
-    interviewer_id: uuid.UUID | None = None  # 非 admin 忽略此字段,身份取会话
+    interviewer_id: uuid.UUID | None = None  # ignored for non-admin; identity comes from the session
     start_date: datetime.date
     end_date: datetime.date
 
@@ -172,7 +172,7 @@ class BulkClaimIn(BaseModel):
 @router.post("/claim-bulk")
 def claim_bulk(payload: BulkClaimIn, db: Session = Depends(get_db),
                sess: UserSession = Depends(get_session)) -> dict:
-    """认领范围内所有可认领的时段(跳过:已被订、已认领过、panel 已满)。"""
+    """Claim every claimable slot in the range (skips: booked, already claimed, full panel)."""
     interviewer_id = _acting_interviewer_id(db, sess, payload.interviewer_id)
     if db.get(Interviewer, interviewer_id) is None:
         raise HTTPException(404, "interviewer not found")
@@ -211,7 +211,7 @@ def claim_bulk(payload: BulkClaimIn, db: Session = Depends(get_db),
 @router.post("/withdraw-bulk")
 def withdraw_bulk(payload: BulkClaimIn, db: Session = Depends(get_db),
                   sess: UserSession = Depends(get_session)) -> dict:
-    """撤回范围内该面试官的所有认领(跳过:已被订且自己是最后一位面试官的时段)。"""
+    """Withdraw all of this interviewer's claims in the range (skips booked slots where they are the last panel member)."""
     interviewer_id = _acting_interviewer_id(db, sess, payload.interviewer_id)
     rows = db.execute(
         select(SlotInterviewer, Slot)
@@ -233,7 +233,7 @@ def withdraw_bulk(payload: BulkClaimIn, db: Session = Depends(get_db),
     withdrawn, skipped = 0, 0
     for claim, slot in rows:
         if slot.status == "booked" and counts.get(slot.id, 0) <= 1:
-            skipped += 1  # booked 时段不能退到 0 面试官
+            skipped += 1  # a booked slot must not drop to zero interviewers
             continue
         db.delete(claim)
         counts[slot.id] = counts.get(slot.id, 1) - 1
@@ -247,7 +247,7 @@ def withdraw_bulk(payload: BulkClaimIn, db: Session = Depends(get_db),
 # ---------- claim / withdraw ----------
 
 class ClaimIn(BaseModel):
-    interviewer_id: uuid.UUID | None = None  # 非 admin 忽略此字段,身份取会话
+    interviewer_id: uuid.UUID | None = None  # ignored for non-admin; identity comes from the session
 
 
 @router.post("/{slot_id}/claim")
@@ -265,7 +265,7 @@ def claim_slot(slot_id: uuid.UUID, payload: ClaimIn, db: Session = Depends(get_d
         raise HTTPException(409, "already claimed by this interviewer")
     db.add(SlotInterviewer(slot_id=slot_id, interviewer_id=interviewer_id))
     try:
-        db.flush()  # 触发 panel 上限 trigger
+        db.flush()  # fires the panel-cap trigger
     except DBAPIError as e:
         db.rollback()
         raise HTTPException(409, f"claim rejected: {e.orig}") from e
@@ -279,7 +279,7 @@ def withdraw_claim(
     slot_id: uuid.UUID, interviewer_id: uuid.UUID, db: Session = Depends(get_db),
     sess: UserSession = Depends(get_session),
 ) -> dict:
-    # 非 admin 只能撤自己的认领
+    # non-admin may only withdraw their own claims
     if sess.role != "admin":
         own = resolve_interviewer(db, sess.email).id
         if interviewer_id != own:
@@ -294,7 +294,7 @@ def withdraw_claim(
         raise HTTPException(404, "claim not found")
     db.delete(claim)
     try:
-        db.flush()  # 触发 booked 保底 trigger(最后一位不能退)
+        db.flush()  # fires the booked-slot guard trigger (last member cannot leave)
     except DBAPIError as e:
         db.rollback()
         raise HTTPException(409, f"withdraw rejected: {e.orig}") from e

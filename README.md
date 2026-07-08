@@ -1,46 +1,52 @@
 # HAS — Hiring Automation System
 
-通过简历 + 申请表筛选候选人、打分(High/Medium/Low)、自动排面试。首个用例:MCMC RISE 实习项目。
+Screens candidates from resume + application form, scores them (High/Medium/Low),
+and automates online interview scheduling. First use case: the MCMC RISE
+internship programme.
 
-## 架构
+## Architecture
 
-| 层 | 选型 |
-|----|------|
-| 前端 | Next.js + TypeScript |
-| 后端 | FastAPI |
-| AI 编排 | LangGraph + Claude(后续) |
-| 数据库 | PostgreSQL (+ pgvector,按需) |
-| 定时任务 | APScheduler(shortlist 自动淘汰) |
+| Layer | Choice |
+|-------|--------|
+| Frontend | Next.js + TypeScript |
+| Backend | FastAPI |
+| AI | LLM layer with Anthropic (preferred) / OpenAI fallback |
+| Database | PostgreSQL (+ pgvector when semantic search is needed) |
+| Scheduled jobs | APScheduler (auto-expiry timers, auto-send) |
+| Object storage | MinIO (resume files) |
 
-## 目录
+## Layout
 
 ```
-db/           schema.sql — 权威 DDL(枚举、约束、触发器、设置 seed)
+db/           schema.sql — authoritative v1 DDL (enums, constraints, triggers, setting seeds)
 backend/      FastAPI + SQLAlchemy + Alembic + APScheduler
-frontend/     Next.js admin dashboard
+frontend/     Next.js dashboard + candidate pages
 docker-compose.yml
 ```
 
-## 一键起栈
+## One-click start
 
-**Windows:双击 `start-has.bat`** —— 自动启动 Docker Desktop(如未运行)→ 起容器 → 等服务就绪 → 打开浏览器。
-停止用 `stop-has.bat`(数据保留);改了代码用 `start-has.bat build` 重建镜像。
+**Windows: double-click `start-has.bat`** — starts Docker Desktop if needed,
+brings up the containers, waits for the services, then opens the browser.
+Stop with `stop-has.bat` (data is kept); after code changes run
+`start-has.bat build` to rebuild images.
 
-或手动:
+Or manually:
 
 ```bash
 docker compose up --build
 ```
 
-- 后端 API:http://localhost:8000/docs
-- 前端:http://localhost:3000(应显示 4 条默认设置 = 闭环打通)
-- Postgres:localhost:5432(has / has)
+- Backend API: http://localhost:8000/docs
+- Frontend: http://localhost:3000
+- Postgres: localhost:5432 (has / has)
+- MinIO console: http://localhost:9001
 
-后端容器启动时自动跑 `alembic upgrade head` 建表。
+The backend container runs `alembic upgrade head` automatically on start.
 
-## 本地分别开发
+## Local development
 
-见 `backend/README.md`。前端:
+See `backend/README.md`. Frontend:
 
 ```bash
 cd frontend
@@ -49,40 +55,52 @@ npm install
 npm run dev
 ```
 
-## 状态
+## Status
 
-- [x] 数据模型 + schema
-- [x] 脚手架(最小闭环:前端 → 后端 → DB)
-- [x] 排期模块:面试官认领 / 候选人选时段(hold→确认→不限次改期)/ 并发行锁
-  - 候选人页 `/booking/{token}`(免登录,凭 token)
-  - 管理页 `/admin/slots`(生成时段网格、认领/撤回)
-  - 确认/改期自动生成邮件草稿(发送待接入)
-- [x] 打分引擎:提交即打分,硬门槛(knockout)+ 加分(bonus)→ High/Medium/Low
-  - High/Medium → shortlist(admin 审查后 Approve 草拟邀请信);Low → 自动婉拒 + talent bank
-  - 申请表 `/apply`(公开),审查队列 `/admin/applications`(band、理由、Approve/Reject)
-  - 理由生成:有 `ANTHROPIC_API_KEY` 用 Claude 润色,否则规则模板(可降级)
-  - 超时无人审自动淘汰 + 婉拒信草稿(APScheduler,天数可配)
-- [x] 职位管理 `/admin/jobs`:贴 JD → AI 解析成筛选规则(chat box)→ 预览修改 → 创建
-  - 每个职位独立规则(`job.requirements`),打分动态执行;开/关职位
-  - AI 解析需 `ANTHROPIC_API_KEY`,无 key 时降级为手动填规则表单
-- [x] 简历上传 + LLM 解析:MinIO 对象存储(PDF/DOCX/TXT ≤5MB)
-  - 后台线程解析(不阻塞提交):文本提取 → LLM 结构化抽取(教育/经历/技能/AI 证据)
-  - ★ 与表单声明交叉核对(consistency notes:CONFIRMED / MISMATCH / NOT FOUND)
-  - 审查页展开可见摘要+核对结果,可下载原文件;打分仍以表单为主数据源
-- [x] 邮件发送:Outbox `/admin/emails`(草稿预览 → 人工 Send);Gmail SMTP(App Password,`.env` 配 `SMTP_*`)
-  - 预约确认/改期信自动发送(纯事实性);邀请/婉拒/offer 走 Outbox 人工审核
-  - SMTP 未配置时草稿保留,页面有提示
-- [x] 面试结果处理:admin 在审查页对已排面试标记 Pass / Fail
-  - Pass → application=passed + offer 信草稿;Fail → rejected(interview_failed)+ 婉拒信草稿(留 talent bank)
-  - 草稿进 Outbox 人工审核发送;pipeline 全链路闭环
-- [x] Analytics `/admin/analytics`:总览卡片、招聘漏斗、band 分布、淘汰原因、各职位统计、近14天趋势、时段利用率、面试官负载
-- [x] 认证:Email OTP(免密码,6 位验证码)+ 邮箱白名单 + Session Cookie(详见 `docs/auth-email-otp.md`)
-  - 两步登录 `/login`(Send Code → Verify);验证码哈希存储、10 分钟过期、单次使用、5 次错误锁定
-  - 白名单管理 `/admin/allowlist`(角色/启停/审计)
-  - 面试官登入后只能以自己身份认领时段;admin 才能进审查/职位/邮件页
-  - 首个 admin 由 `ADMIN_EMAIL` 环境变量启动时写入
-- [x] 双 timer:无人审(未发邀请)/ 候选人无响应(邀请发出 N 天未预约),互不误伤,天数均可配
-- [x] 面试官通知:候选人确认/改期预约后,panel 面试官收到邮件(时间 + 候选人 + 会议链接)
-- [x] Admin 设置页 `/admin/settings`:审查期限/时段长度/panel 上限/改期上限/公司署名,带取值校验,改动即时生效
-- [ ] 真实会议链接(目前为 Jitsi 占位)
-```
+- [x] Data model + schema
+- [x] Scaffold (minimal loop: frontend → backend → DB)
+- [x] Scheduling module: interviewer slot claiming / candidate slot picking
+      (hold → confirm → unlimited reschedules) / row-lock concurrency safety
+  - Candidate page `/booking/{token}` (no login, token-based)
+  - Staff page `/admin/slots` (grid generation, claim/withdraw, bulk actions)
+- [x] Scoring engine: knockout (hard requirements) + bonus points → High/Medium/Low
+  - High/Medium → shortlist (admin reviews, then Approve drafts the invite);
+    Low → automatic rejection letter + talent bank
+  - Two-step application: `/apply` (academics) → `/apply/skills` (skill assessment;
+    scoring inputs are derived from the skill list)
+  - Reasoning text polished by the LLM when a key is configured, rule-based fallback
+  - Auto-expiry timers with configurable windows (unreviewed shortlist / unresponsive candidate)
+- [x] Jobs admin `/admin/jobs`: paste a JD → AI digests it into a screening profile
+      (summary + must-have + nice-to-have) plus fixed-form rules → editable → create
+  - Per-job rules in `job.requirements`, applied dynamically by the scoring engine
+- [x] Resume upload + LLM parsing: MinIO storage (PDF/DOCX/TXT ≤ 5MB)
+  - Background parsing (never blocks submission): text extraction → structured
+    LLM extraction (education/experience/skills/AI evidence)
+  - Cross-checks resume against form claims (CONFIRMED / MISMATCH / NOT FOUND)
+  - Evaluates the resume against the job's screening profile → per-criterion
+    match with evidence + 0-100 match score + verdict
+  - Staff-wide resume library at `/admin/resumes` (view inline / download)
+- [x] Email sending: outbox `/admin/emails` (preview → manual send); Gmail SMTP
+  - Booking confirmation/reschedule emails send automatically (factual content)
+  - Offer letters send immediately on Accept; low-band rejection letters send
+    automatically after a configurable review window; all other letters are manual
+- [x] Interview outcomes `/admin/outcomes`: awaiting-decision queue (interview
+      time passed) with Accept/Reject + confirmation, upcoming interviews,
+      recent decisions
+- [x] Analytics `/admin/analytics`: overview cards, hiring funnel, band
+      distribution, rejection reasons, per-job stats, 14-day trend, slot
+      utilisation, interviewer load — plus Excel export (multi-sheet workbook
+      with raw application/interview detail)
+- [x] Authentication: passwordless Email OTP (6-digit code) + email allowlist +
+      server-side sessions (see `docs/auth-email-otp.md`)
+  - Two-step `/login` (Send Code → Verify); hashed codes, 10-minute expiry,
+    single-use, locked after 5 wrong attempts
+  - Allowlist management `/admin/allowlist` (roles / enable / audit trail)
+  - Interviewers can only act as themselves; admin-only management pages
+  - First admin seeded from the `ADMIN_EMAIL` environment variable
+- [x] Panel notifications: interviewers get an email when a candidate books or
+      reschedules their slot
+- [x] Settings page `/admin/settings`: review windows, slot length, working
+      hours, panel cap, reschedule limit, company name, invite email template —
+      validated, effective immediately
+- [ ] Real meeting links (currently a Jitsi placeholder)

@@ -1,8 +1,9 @@
-"""LLM provider 抽象:优先 Anthropic(Claude),其次 OpenAI(GPT),都没有则不可用。
+"""LLM provider abstraction: Anthropic (Claude) preferred, OpenAI (GPT) as
+fallback; unavailable when neither key is configured.
 
-两个能力:
-- tool_call:强制结构化输出(JD 解析用)
-- complete_text:短文本生成(打分理由润色用)
+Two capabilities:
+- tool_call: forced structured output (used for JD parsing)
+- complete_text: short text generation (used to polish scoring reasoning)
 """
 
 import json
@@ -27,7 +28,7 @@ def provider() -> str | None:
 
 def tool_call(prompt: str, tool_name: str, description: str, schema: dict,
               max_tokens: int = 1500) -> tuple[dict, str]:
-    """强制一次结构化工具调用,返回 (参数 dict, 使用的模型)。无 provider 抛 RuntimeError。"""
+    """Force one structured tool call; returns (args dict, model used). Raises RuntimeError without a provider."""
     p = provider()
     if p == "anthropic":
         import anthropic
@@ -62,7 +63,7 @@ def tool_call(prompt: str, tool_name: str, description: str, schema: dict,
 
 
 def complete_text(prompt: str, max_tokens: int = 300) -> tuple[str, str] | None:
-    """短文本生成,返回 (文本, 模型);无 provider 或失败返回 None(调用方降级)。"""
+    """Short text generation; returns (text, model), or None when no provider / on failure (caller degrades)."""
     p = provider()
     try:
         if p == "anthropic":
@@ -85,6 +86,6 @@ def complete_text(prompt: str, max_tokens: int = 300) -> tuple[str, str] | None:
                 messages=[{"role": "user", "content": prompt}],
             )
             return resp.choices[0].message.content.strip(), OPENAI_MODEL
-    except Exception as e:  # 网络/额度问题一律降级
+    except Exception as e:  # degrade on any network/quota problem
         logger.warning("LLM text completion failed: %s", e)
     return None

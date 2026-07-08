@@ -23,7 +23,7 @@ pypdf = "^5.1.0"
 python-docx = "^1.1.0"
 python-multipart = "^0.0.17"
 openpyxl = "^3.1.0"
-# 打分/简历解析阶段再加:langgraph、langchain-anthropic
+# add when needed: langgraph, langchain-anthropic
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.7.0"

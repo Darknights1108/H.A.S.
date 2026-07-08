@@ -1,17 +1,17 @@
-"""Email OTP 登录 + 白名单管理 API(免密码)。
+"""Email OTP login + allowlist management API (passwordless).
 
-登录流(两步):
-  POST /auth/request-otp   输入邮箱 → 白名单+限流校验 → 邮件发 6 位验证码
-                           (统一泛化回复,不泄露邮箱是否在册)
-  POST /auth/verify-otp    邮箱+验证码 → 校验(未过期/未用过/尝试次数未超限)
-                           → 码立即作废 → 建会话 → 种 HttpOnly cookie
-  GET  /auth/me            当前会话信息
-  POST /auth/logout        吊销会话 + 清 cookie
+Login flow (two steps):
+  POST /auth/request-otp   email in -> allowlist + rate-limit checks -> 6-digit code emailed
+                           (uniform generic response; never reveals whether an email is registered)
+  POST /auth/verify-otp    email + code -> checks (unexpired / unused / attempts under cap)
+                           -> code invalidated immediately -> session created -> HttpOnly cookie set
+  GET  /auth/me            current session info
+  POST /auth/logout        revoke session + clear cookie
 
-安全:验证码只存 SHA-256 哈希(加邮箱盐);有效期 otp_ttl_minutes(默认 10 分钟);
-单次使用;每码最多 otp_max_attempts 次失败尝试;请求限流 3/邮箱 + 10/IP 每 15 分钟。
-白名单(admin):GET/POST /auth/allowlist,PATCH/DELETE /auth/allowlist/{id}。
-所有关键动作写入 auth_log。
+Security: codes stored as email-salted SHA-256 only; valid for otp_ttl_minutes (default 10);
+single-use; at most otp_max_attempts failed tries per code; requests limited to 3/email + 10/IP per 15 minutes.
+Allowlist (admin): GET/POST /auth/allowlist, PATCH/DELETE /auth/allowlist/{id}.
+Every significant action is written to auth_log.
 """
 
 import datetime
@@ -43,7 +43,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 GENERIC_MSG = "If this email is allowed, a verification code has been sent. Check your inbox."
 INVALID_MSG = "Invalid or expired code. Please check the code or request a new one."
 ROLES = ("admin", "interviewer", "lecturer", "supervisor", "user")
-# 限流窗口:同邮箱 15 分钟最多 3 次;同 IP 15 分钟最多 10 次
+# Rate-limit window: max 3 per email and 10 per IP per 15 minutes
 RATE_WINDOW_MIN = 15
 RATE_MAX_PER_EMAIL = 3
 RATE_MAX_PER_IP = 10
@@ -54,7 +54,7 @@ def _new_otp() -> str:
 
 
 def _otp_hash(email: str, code: str) -> str:
-    # 用邮箱作盐,防止彩虹表/跨用户比对
+    # Salt with the email to defeat rainbow tables / cross-user comparison
     return hash_token(f"{email}:{code}")
 
 
@@ -77,12 +77,12 @@ def request_otp(payload: RequestOtpIn, request: Request, db: Session = Depends(g
 
     entry = db.scalar(select(AllowedEmail).where(AllowedEmail.email == email))
     if entry is None or not entry.enabled:
-        # 不发送、不泄露;仅记审计
+        # no send, no disclosure; audit only
         log_auth(db, "otp_denied", email, ip,
                  "not in allowlist" if entry is None else "disabled")
         return generic()
 
-    # 限流(静默拒绝,响应仍泛化)
+    # rate limiting (silent refusal; response stays generic)
     n_email = db.scalar(
         select(func.count()).select_from(LoginToken)
         .where(LoginToken.email == email, LoginToken.created_at > since)
@@ -121,7 +121,7 @@ def request_otp(payload: RequestOtpIn, request: Request, db: Session = Depends(g
         log_auth(db, "otp_requested", email, ip)
     except Exception as e:
         log_auth(db, "otp_send_failed", email, ip, str(e))
-    # 开发模式可直接回传验证码,便于本地/自动化测试;生产必须关闭
+    # Dev mode can echo the code for local/automated tests; MUST be off in production
     return generic({"debug_code": code} if settings.debug_expose_otp else None)
 
 
@@ -137,7 +137,7 @@ def verify_otp(payload: VerifyOtpIn, request: Request, response: Response,
     code = payload.code.strip()
     ip = request.client.host if request.client else None
 
-    # 只认该邮箱最新一条未使用的码(申请新码即自动作废旧码)
+    # Only the latest unused code counts (requesting a new code invalidates older ones)
     row = db.scalar(
         select(LoginToken)
         .where(LoginToken.email == email, LoginToken.used_at.is_(None))
@@ -163,9 +163,9 @@ def verify_otp(payload: VerifyOtpIn, request: Request, response: Response,
         db.commit()
         raise HTTPException(401, INVALID_MSG)
 
-    row.used_at = utcnow()                      # 单次使用:立即失效
+    row.used_at = utcnow()                      # single-use: invalidate immediately
     if entry.verified_at is None:
-        entry.verified_at = utcnow()            # 邮箱所有权已验证
+        entry.verified_at = utcnow()            # email ownership verified
 
     session_raw = new_raw_token()
     db.add(UserSession(
@@ -212,7 +212,7 @@ def logout(response: Response, sess: UserSession = Depends(get_session),
     return {"message": "logged out"}
 
 
-# ---------- 白名单管理(admin) ----------
+# ---------- allowlist management (admin) ----------
 
 class AllowIn(BaseModel):
     email: EmailStr
@@ -269,7 +269,7 @@ def update_allowlist(entry_id: uuid.UUID, payload: AllowPatch,
         entry.enabled = payload.enabled
         changes.append(f"enabled={payload.enabled}")
         if not payload.enabled:
-            _revoke_sessions(db, entry.email)   # 禁用即踢下线
+            _revoke_sessions(db, entry.email)   # disabling kicks the user out immediately
     if payload.role is not None:
         if payload.role not in ROLES:
             raise HTTPException(422, f"role must be one of {ROLES}")

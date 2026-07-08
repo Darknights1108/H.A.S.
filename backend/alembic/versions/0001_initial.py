@@ -1,4 +1,4 @@
-"""initial schema — 直接执行 db/schema.sql(含枚举、约束、触发器、设置 seed)
+"""initial schema — executes db/schema.sql directly (enums, constraints, triggers, setting seeds)
 
 Revision ID: 0001
 Revises:
@@ -17,7 +17,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def _schema_sql() -> str:
-    # 优先用环境变量(docker 镜像内),否则按相对路径定位 repo 根的 db/schema.sql
+    # Prefer the env var (inside the docker image); otherwise locate db/schema.sql relative to the repo root
     env_path = os.environ.get("HAS_SCHEMA_SQL")
     if env_path:
         path = Path(env_path)
@@ -31,5 +31,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # baseline 迁移:开发环境下整体重置 public schema
+    # baseline migration: in dev, reset the whole public schema
     op.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")

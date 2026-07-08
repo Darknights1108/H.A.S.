@@ -1,4 +1,4 @@
-"""排期模块共用逻辑:设置读取、时段释放、邮件草稿。"""
+"""Shared scheduling logic: setting reads, slot release, email drafts."""
 
 import uuid
 
@@ -25,13 +25,13 @@ def interviewer_count(db: Session, slot_id: uuid.UUID) -> int:
 
 
 def release_slot(db: Session, slot: Slot) -> None:
-    """候选人撤回/改期后释放时段:回到 open(仍有面试官)或 empty。"""
+    """Release a slot after candidate withdrawal/reschedule: back to open (still has interviewers) or empty."""
     slot.candidate_id = None
     slot.status = "open" if interviewer_count(db, slot.id) > 0 else "empty"
 
 
 def recompute_unbooked_status(db: Session, slot: Slot) -> None:
-    """面试官认领/撤回后刷新未被预订时段的状态。"""
+    """Refresh an unbooked slot's status after an interviewer claims/withdraws."""
     if slot.status == "booked":
         return
     slot.status = "open" if interviewer_count(db, slot.id) > 0 else "empty"

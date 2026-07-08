@@ -1,4 +1,4 @@
-"""Outbox API:邮件草稿列表 + 人工审核发送。"""
+"""Outbox API: email draft list + manual review-and-send."""
 
 import uuid
 

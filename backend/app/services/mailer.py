@@ -1,8 +1,9 @@
-"""SMTP 邮件发送(Gmail:STARTTLS + App Password)。
+"""SMTP email sending (Gmail: STARTTLS + App Password).
 
-send_draft:发送一条 email_log 草稿并把状态置为 sent。
-SMTP 未配置或发送失败会抛 RuntimeError,调用方决定如何呈现;
-自动发送场景(预约确认)失败时不阻塞主流程,邮件保留为 draft 可去 Outbox 重发。
+send_draft: send an email_log draft and mark it sent.
+Raises RuntimeError when SMTP is unconfigured or sending fails; callers decide
+how to surface it. Auto-send paths (booking confirmations) never block the main
+flow — the email stays a draft and can be re-sent from the outbox.
 """
 
 import datetime
@@ -35,7 +36,7 @@ def send_raw(to: str, subject: str, body: str) -> None:
 
 
 def send_draft(db: Session, email: EmailLog) -> None:
-    """发送草稿并置 sent;调用方负责 commit。失败抛 RuntimeError,状态保持 draft。"""
+    """Send a draft and mark it sent; caller commits. Raises RuntimeError on failure, status stays draft."""
     if email.status == "sent":
         raise RuntimeError("email already sent")
     app_ = db.get(Application, email.application_id)
@@ -52,7 +53,7 @@ def send_draft(db: Session, email: EmailLog) -> None:
 
 
 def try_send_draft(db: Session, email: EmailLog) -> bool:
-    """自动发送场景:尽力发送,失败只记日志返回 False(草稿保留,可人工重发)。"""
+    """Auto-send path: best effort; on failure just log and return False (draft kept for manual send)."""
     try:
         send_draft(db, email)
         return True

@@ -1,4 +1,4 @@
-"""定时任务:每天扫描 shortlist,把超过配置天数无人审查的申请自动淘汰。"""
+"""Scheduled jobs: daily scans that auto-expire stale applications and auto-send letters."""
 
 import datetime
 import logging
@@ -26,9 +26,11 @@ def _reject_with_letter(db, app_, reason: str) -> None:
 
 
 def expire_stale_shortlist() -> int:
-    """无人审 timer:shortlisted 超过 shortlist_review_days 且【尚未发出邀请】的,自动淘汰。
+    """No-review timer: auto-reject applications shortlisted longer than
+    shortlist_review_days that have NOT had an invite sent.
 
-    已发出邀请的申请视为"已审查",交给 expire_no_response 处理。
+    Applications with a sent invite count as reviewed and are handled by
+    expire_no_response instead.
     """
     from sqlalchemy import exists
 
@@ -64,8 +66,9 @@ def expire_stale_shortlist() -> int:
 
 
 def expire_no_response() -> int:
-    """候选人无响应 timer:邀请已发出超过 candidate_response_days 仍未预约(状态还在
-    shortlisted)的,自动淘汰。"""
+    """Candidate no-response timer: auto-reject applications whose invite was sent
+    more than candidate_response_days ago but still have no booking (status
+    still shortlisted)."""
     from sqlalchemy import func
 
     from .models import Application, EmailLog
@@ -99,10 +102,10 @@ def expire_no_response() -> int:
 
 
 def auto_send_low_reject_emails() -> int:
-    """Low(初筛淘汰)的婉拒信:草稿满 N 天后自动发送。
+    """Low-band rejection letters: auto-send drafts once they are N days old.
 
-    其他拒信(人工拒 / 面试未过 / 超时)仍需 admin 在 Outbox 人工发送。
-    发送失败保留草稿,次日重试。
+    Other rejection letters (manual / interview failed / timers) still require
+    a manual send from the outbox. Failures keep the draft and retry next day.
     """
     from sqlalchemy import select as _select
 
@@ -141,7 +144,7 @@ def start_scheduler() -> None:
     if _scheduler is not None:
         return
     _scheduler = BackgroundScheduler(timezone="Asia/Kuala_Lumpur")
-    # 每天 02:00 / 02:05 MYT
+    # Daily at 02:00 / 02:05 MYT
     _scheduler.add_job(expire_stale_shortlist, "cron", hour=2, id="expire_shortlist")
     _scheduler.add_job(expire_no_response, "cron", hour=2, minute=5, id="expire_no_response")
     _scheduler.add_job(auto_send_low_reject_emails, "cron", hour=2, minute=10,

@@ -1,9 +1,11 @@
-"""Magic-link 认证核心:令牌/会话哈希、FastAPI 依赖(会话校验、角色守卫)、审计日志。
+"""Auth core: token/session hashing, FastAPI dependencies (session check, role
+guards) and audit logging.
 
-安全要点:
-- 令牌与会话 cookie 均为 secrets.token_urlsafe(48) 随机值,数据库只存 sha256 哈希
-- 会话存服务端(user_session 表),可随时吊销;cookie 为 HttpOnly + SameSite=Lax
-- 生产环境置 COOKIE_SECURE=true(HTTPS)
+Security notes:
+- Session cookie values are secrets.token_urlsafe(48); only sha256 hashes are stored
+- Sessions are server-side (user_session table) and revocable at any time;
+  the cookie is HttpOnly + SameSite=Lax
+- Set COOKIE_SECURE=true in production (HTTPS)
 """
 
 import datetime
@@ -43,7 +45,7 @@ def get_session(
     db: Session = Depends(get_db),
     has_session: str | None = Cookie(default=None),
 ) -> UserSession:
-    """从 cookie 解析有效会话;无/过期/已吊销一律 401。"""
+    """Resolve a valid session from the cookie; missing/expired/revoked -> 401."""
     if not has_session:
         raise HTTPException(401, "not authenticated")
     row = db.scalar(
@@ -61,7 +63,7 @@ def require_admin(sess: UserSession = Depends(get_session)) -> UserSession:
 
 
 def resolve_interviewer(db: Session, email: str, name: str | None = None) -> Interviewer:
-    """按邮箱取(或创建)对应的面试官记录 —— 非 admin 角色认领时段时的身份。"""
+    """Get (or create) the interviewer record for an email — the acting identity for non-admin staff."""
     itv = db.scalar(select(Interviewer).where(Interviewer.email == email))
     if itv is None:
         itv = Interviewer(name=name or email.split("@")[0], email=email)

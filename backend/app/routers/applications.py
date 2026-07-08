@@ -1,11 +1,11 @@
-"""申请与审查 API。
+"""Applications & review API.
 
-公开:GET /jobs(开放职位)、POST /applications(提交申请,提交即自动打分分流)
-管理:GET /applications(审查队列)、POST /applications/{id}/approve(草拟邀请信)、
-      POST /applications/{id}/reject(人工淘汰)
+Public: GET /jobs (open positions), POST /applications (submit an application)
+Admin: GET /applications (review queue), POST /applications/{id}/approve (draft the invite),
+       POST /applications/{id}/reject (manual rejection)
 
-分流规则:High/Medium → shortlisted(等 admin 审查,不自动发信);
-          Low → rejected(low_band)+ 婉拒信草稿(仍留在 talent bank,需候选人同意)。
+Routing: High/Medium -> shortlisted (awaits admin review; nothing auto-sent);
+          Low -> rejected (low_band) + rejection letter draft (kept in the talent bank with consent).
 """
 
 import datetime
@@ -41,11 +41,11 @@ def list_jobs(db: Session = Depends(get_db)) -> list[dict]:
     return [{"id": str(j.id), "title": j.title, "description": j.description} for j in jobs]
 
 
-# ---------- resume skill suggestion(提交前调用,从简历提取技能 chips)----------
+# ---------- resume skill suggestion (pre-submit; extracts skill chips from the resume) ----------
 
 @router.post("/resume/skill-suggest")
 def suggest_skills(resume: UploadFile = File(...)) -> dict:
-    """从上传的简历即时提取技能列表,供申请表 Skills 区显示建议 chips。"""
+    """Instantly extract a skill list from the uploaded resume for the form's suggestion chips."""
     if llm.provider() is None:
         raise HTTPException(503, "skill suggestion unavailable (no LLM key)")
     if not resume.filename or "." not in resume.filename:
@@ -97,7 +97,7 @@ AI_KEYWORDS = ["ai", "machine learning", "deep learning", "nlp", "llm", "neural"
 
 
 def _derive_scoring_flags(skills: list[str]) -> tuple[list[str], bool, bool]:
-    """从技能列表推导打分要素:编程语言 / SQL / AI。"""
+    """Derive scoring inputs from the skill list: programming languages / SQL / AI."""
     low = [x.lower() for x in skills]
     langs: list[str] = []
     for lang in KNOWN_LANGS:
@@ -112,7 +112,7 @@ def _derive_scoring_flags(skills: list[str]) -> tuple[list[str], bool, bool]:
 
 
 def _score_and_route(db: Session, app_: Application, candidate: Candidate, job: Job) -> None:
-    """打分并分流:Low → 拒 + 婉拒信;否则进 shortlist。"""
+    """Score and route: Low -> reject + letter; otherwise shortlist."""
     score = score_application(db, app_)
     if score.band == "low":
         app_.status = "rejected"
@@ -124,10 +124,10 @@ def _score_and_route(db: Session, app_: Application, candidate: Candidate, job: 
         app_.shortlisted_at = datetime.datetime.now(datetime.timezone.utc)
 
 
-# ---------- public submission(multipart:表单字段 + 可选简历文件)----------
+# ---------- public submission (multipart: form fields + optional resume file) ----------
 
 class ApplicationIn(BaseModel):
-    """multipart 字段先解析成本模型再走原有逻辑。"""
+    """Multipart fields are parsed into this model before the original logic runs."""
 
     job_id: uuid.UUID
     name: str = Field(min_length=1)
@@ -157,7 +157,7 @@ def submit_application(
     has_ai_study: bool = Form(False),
     eca: str | None = Form(None),
     consent_talent_bank: bool = Form(False),
-    # 可选补充信息(仅存 form_data,不参与打分)
+    # Optional extra info (stored in form_data only; not scored)
     education_level: str | None = Form(None),
     institution: str | None = Form(None),
     skills: str = Form("[]"),               # JSON array string
@@ -187,7 +187,7 @@ def submit_application(
         consent_talent_bank=consent_talent_bank,
     )
 
-    # 简历文件先校验(格式/大小),申请建好后再入库存储
+    # Validate the resume first (type/size); store it after the application row exists
     resume_data: bytes | None = None
     resume_ext = ""
     if resume is not None and resume.filename:
@@ -247,7 +247,7 @@ def submit_application(
     db.add(app_)
     db.flush()
 
-    # 简历入对象存储(存储故障不吞:候选人应重试,而不是简历悄悄丢失)
+    # Store the resume in object storage (never swallow storage failures: the candidate should retry, not lose the file silently)
     if resume_data is not None:
         key = f"{app_.id}{resume_ext}"
         try:
@@ -257,10 +257,10 @@ def submit_application(
         app_.resume_file_url = key
         app_.resume_parse_status = "pending"
 
-    # 打分推迟到 Skill Assessment 完成时(编程语言/SQL/AI 从技能列表推导)
+    # Scoring is deferred until Skill Assessment completes (languages/SQL/AI derived from the skill list)
     db.commit()
     if resume_data is not None:
-        parse_resume_async(app_.id)  # 后台 LLM 解析,不阻塞提交
+        parse_resume_async(app_.id)  # background LLM parse; never blocks submission
     return {
         "application_id": str(app_.id),
         "skill_token": str(app_.booking_token),
@@ -268,7 +268,7 @@ def submit_application(
     }
 
 
-# ---------- skill assessment(提交后的第二步,公开凭 token)----------
+# ---------- skill assessment (step 2 after submission; public, token-based) ----------
 
 @router.get("/skill-assessment/{token}")
 def get_skill_assessment(token: uuid.UUID, db: Session = Depends(get_db)) -> dict:
@@ -298,7 +298,7 @@ class SkillsIn(BaseModel):
 @router.post("/skill-assessment/{token}")
 def submit_skill_assessment(token: uuid.UUID, payload: SkillsIn,
                             db: Session = Depends(get_db)) -> dict:
-    """完成技能评估:存技能 → 推导打分要素 → 打分分流。每份申请只能提交一次。"""
+    """Complete the skill assessment: store skills -> derive scoring inputs -> score and route. One submission per application."""
     app_ = db.scalar(select(Application).where(Application.booking_token == token))
     if app_ is None:
         raise HTTPException(404, "not found")
@@ -331,14 +331,14 @@ def list_applications(db: Session = Depends(get_db),
         .outerjoin(Score, Score.application_id == Application.id)
         .order_by(Application.submitted_at.desc())
     ).all()
-    # 邀请信状态(none/draft/sent)——给审查页显示与按钮控制
+    # Invite status (none/draft/sent) — drives review-page display and buttons
     invite_map: dict = {}
     for app_id, status in db.execute(
         select(EmailLog.application_id, EmailLog.status).where(EmailLog.type == "invite")
     ):
         if invite_map.get(app_id) != "sent":
             invite_map[app_id] = status
-    # 各申请当前排定的面试(用于显示时间 + Pass/Fail 操作)
+    # Each application's currently scheduled interview (for display + outcome actions)
     itv_map = {
         i.application_id: (i, sl)
         for i, sl in db.execute(
@@ -347,7 +347,7 @@ def list_applications(db: Session = Depends(get_db),
             .where(Interview.status == "scheduled")
         )
     }
-    # 面试 panel 名单
+    # interview panel names
     slot_ids = [sl.id for _, sl in itv_map.values()]
     panel_map: dict = {}
     if slot_ids:
@@ -405,7 +405,7 @@ def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)
     if app_.status != "shortlisted":
         raise HTTPException(409, f"application not in shortlist ({app_.status})")
     booking_url = f"{settings.frontend_base_url}/booking/{app_.booking_token}"
-    # 幂等:已有邀请信就不再重复起草
+    # Idempotent: never draft a duplicate invite
     existing = db.scalar(
         select(EmailLog).where(
             EmailLog.application_id == app_.id, EmailLog.type == "invite"
@@ -429,7 +429,7 @@ def approve_application(application_id: uuid.UUID, db: Session = Depends(get_db)
 @router.get("/resumes")
 def list_resumes(db: Session = Depends(get_db),
                  _staff: UserSession = Depends(get_session)) -> list[dict]:
-    """全部已上传简历(admin 与 interviewer 均可查看/下载)。"""
+    """All uploaded resumes (viewable/downloadable by admin and interviewers)."""
     rows = db.execute(
         select(Application, Candidate, Job)
         .join(Candidate, Candidate.id == Application.candidate_id)
@@ -456,7 +456,7 @@ def list_resumes(db: Session = Depends(get_db),
 def download_resume(application_id: uuid.UUID, inline: bool = False,
                     db: Session = Depends(get_db),
                     _staff: UserSession = Depends(get_session)) -> StreamingResponse:
-    """简历文件(staff:admin + interviewer)。inline=true 时浏览器内预览。"""
+    """Resume file (staff: admin + interviewer). inline=true serves it for in-browser preview."""
     app_ = db.get(Application, application_id)
     if app_ is None or not app_.resume_file_url:
         raise HTTPException(404, "no resume for this application")
@@ -482,7 +482,7 @@ def record_outcome(
     application_id: uuid.UUID, payload: OutcomeIn, db: Session = Depends(get_db),
     _admin: UserSession = Depends(require_admin),
 ) -> dict:
-    """面试结果:passed → offer 信草稿;failed → 婉拒信草稿 + talent bank。"""
+    """Interview outcome: passed -> offer letter; failed -> rejection letter + talent bank."""
     if payload.result not in ("passed", "failed"):
         raise HTTPException(422, "result must be 'passed' or 'failed'")
     app_ = db.get(Application, application_id)
@@ -506,7 +506,7 @@ def record_outcome(
         subject, body = offer_email(db, candidate, job)
         email = draft_email(db, app_, "offer", subject, body)
         db.flush()
-        offer_sent = try_send_draft(db, email)  # Accept 即发送;失败保留草稿可人工重发
+        offer_sent = try_send_draft(db, email)  # Sends on Accept; failure keeps the draft for a manual send
     else:
         app_.status = "rejected"
         app_.rejected_reason = "interview_failed"

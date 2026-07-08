@@ -31,7 +31,7 @@ const PLACEHOLDER_HINT =
   "Placeholders: {candidate_name} · {job_title} · {booking_url} · {company_name}";
 const TEMPLATE_KEYS = new Set(["invite_email_subject", "invite_email_template"]);
 
-// 展示顺序:流程配置 → 时段配置 → 信件配置
+// display order: workflow settings -> slot settings -> letter settings
 const ORDER = [
   "shortlist_review_days",
   "candidate_response_days",

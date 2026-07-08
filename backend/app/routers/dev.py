@@ -1,4 +1,4 @@
-"""开发辅助接口 — 仅用于本地/演示,上生产前移除或加开关。"""
+"""Dev helper endpoints — local/demo only; remove or gate before production."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/dev", tags=["dev"])
 
 @router.post("/seed")
 def seed_demo(db: Session = Depends(get_db)) -> dict:
-    """造一套演示数据:job + 候选人(shortlisted)+ 两位面试官。幂等。"""
+    """Seed demo data: a job + a shortlisted candidate + two interviewers. Idempotent."""
     job = db.scalar(select(Job).where(Job.title == "RISE@MCMC Internship (Demo)"))
     if job is None:
         job = Job(

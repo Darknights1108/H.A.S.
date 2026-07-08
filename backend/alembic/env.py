@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.config import settings
 from app.database import Base
-from app import models  # noqa: F401  确保所有 model 被导入到 metadata
+from app import models  # noqa: F401  ensure every model is imported into metadata
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

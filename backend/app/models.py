@@ -1,7 +1,8 @@
 """SQLAlchemy ORM models — mirror db/schema.sql.
 
-注意:v1 的建表/枚举/触发器由 Alembic 初始迁移直接执行 schema.sql 完成,
-这里的 model 仅用于应用层查询。PG 枚举类型用 create_type=False 引用已存在的类型。
+Note: v1 tables/enums/triggers are created by the initial Alembic migration
+executing schema.sql directly; these models exist for application-layer
+queries. PG enum types use create_type=False to reference existing types.
 """
 
 import datetime
@@ -23,7 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
 
-# --- 引用 schema.sql 中已创建的枚举类型(不重复创建)---
+# --- reference enum types created by schema.sql (do not recreate) ---
 application_status = ENUM(
     "applied", "scored", "shortlisted", "scheduled", "interviewed", "passed", "rejected",
     name="application_status", create_type=False,

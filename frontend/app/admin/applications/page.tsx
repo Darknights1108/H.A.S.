@@ -56,7 +56,7 @@ export default function AdminApplicationsPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
-  // 二次确认:待确认的面试结果 {申请id, 结果} —— 防误点
+  // second confirmation: pending outcome {application id, result} — prevents misclicks
   const [pending, setPending] = useState<{ id: string; result: "passed" | "failed" } | null>(null);
 
   const load = useCallback(async () => {

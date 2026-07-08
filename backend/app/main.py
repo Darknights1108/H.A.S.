@@ -17,7 +17,7 @@ from .scheduler import shutdown_scheduler, start_scheduler
 
 
 def _bootstrap_admin() -> None:
-    """白名单为空时写入初始 admin(来自 ADMIN_EMAIL),否则谁都登不进。"""
+    """Seed the initial admin (from ADMIN_EMAIL) so someone can actually log in."""
     if not settings.admin_email:
         return
     from sqlalchemy import select

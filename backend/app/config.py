@@ -4,28 +4,28 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # 本地默认值;docker 里通过环境变量覆盖(host = db)
+    # Local defaults; overridden by env vars inside docker (host = db)
     database_url: str = "postgresql+psycopg2://has:has@localhost:5432/has"
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
-    # 逗号分隔的允许来源
+    # Comma-separated allowed origins
     cors_origins: str = "http://localhost:3000"
-    # 候选人邮件里的预约链接前缀
+    # Base URL used for booking links in candidate emails
     frontend_base_url: str = "http://localhost:3000"
-    # SMTP(Gmail:smtp.gmail.com:587 + App Password)
+    # SMTP (Gmail: smtp.gmail.com:587 + App Password)
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
-    smtp_from: str | None = None  # 形如 "HAS Recruitment <me@gmail.com>"
-    # 认证(magic link + session cookie)
-    admin_email: str | None = None       # 启动时自动写入白名单的初始 admin
-    otp_ttl_minutes: int = 10            # OTP 验证码有效期(5-10 分钟)
-    otp_max_attempts: int = 5            # 单个验证码最多验证失败次数
-    session_ttl_days: int = 7            # 会话有效期
-    cookie_secure: bool = False          # 生产 HTTPS 环境置 true
-    debug_expose_otp: bool = False       # 仅开发:request-otp 响应直接带验证码
-    # 对象存储(简历文件)
+    smtp_from: str | None = None  # e.g. "HAS Recruitment <me@gmail.com>"
+    # Authentication (Email OTP + session cookie)
+    admin_email: str | None = None       # initial admin seeded into the allowlist at startup
+    otp_ttl_minutes: int = 10            # OTP validity (5-10 minutes)
+    otp_max_attempts: int = 5            # max failed attempts per code
+    session_ttl_days: int = 7            # session lifetime
+    cookie_secure: bool = False          # set true in HTTPS production
+    debug_expose_otp: bool = False       # dev only: echo the code in the request-otp response
+    # Object storage (resume files)
     minio_endpoint: str = "localhost:9000"
     minio_access_key: str = "has"
     minio_secret_key: str = "hasminio123"

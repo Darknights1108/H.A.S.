@@ -61,7 +61,7 @@ export default function AdminSlotsPage() {
   }
 
   const isAdmin = session?.role === "admin";
-  // 非 admin：身份 = 自己；请求体不带 interviewer_id（后端从会话解析）
+  // non-admin: identity = self; no interviewer_id in the body (backend resolves it from the session)
   const actingId = isAdmin ? selected : session?.interviewer_id ?? "";
   const idBody = isAdmin ? { interviewer_id: selected } : {};
 

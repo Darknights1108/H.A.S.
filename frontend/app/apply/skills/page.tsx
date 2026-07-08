@@ -36,7 +36,7 @@ function SkillsInner() {
       const d: Assessment = await r.json();
       setData(d);
       setSkills(d.current_skills ?? []);
-      // 申请页选简历时 AI 已提取过技能,从 sessionStorage 带过来补充
+      // skills were already AI-extracted when the resume was picked on the apply page; merge them from sessionStorage
       try {
         const cached = JSON.parse(sessionStorage.getItem("has_resume_skills") ?? "[]");
         if (Array.isArray(cached)) setResumeExtra(cached.map(String));

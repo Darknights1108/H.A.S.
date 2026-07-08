@@ -1,8 +1,11 @@
-"""简历解析:文本提取(PDF/DOCX/TXT)→ LLM 结构化抽取 + 与表单声明交叉核对。
+"""Resume parsing: text extraction (PDF/DOCX/TXT) -> structured LLM extraction
++ cross-check against form claims.
 
-设计原则(项目早期约定):表单是硬门槛判断的主数据源;简历解析只做"佐证情报"
-给 admin 看(摘要 + consistency notes),不改变打分结果。
-解析在后台线程执行,失败不影响申请流程(status=failed,可人工看原文件)。
+Design principle (agreed early in the project): the form is the primary source
+for knockout checks; resume parsing is supporting intelligence for the admin
+(summary + consistency notes) and never changes the score.
+Parsing runs in a background thread; failures never affect the application flow
+(status=failed, the original file remains viewable).
 """
 
 import io
@@ -19,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_EXTS = {".pdf", ".docx", ".txt"}
 MAX_SIZE = 5 * 1024 * 1024  # 5MB
-MAX_TEXT_CHARS = 15000       # 喂给 LLM 的文本上限
+MAX_TEXT_CHARS = 15000       # max characters fed to the LLM
 
 EXTRACT_TOOL = {
     "name": "submit_resume_analysis",
@@ -180,5 +183,5 @@ def _parse(application_id: uuid.UUID) -> None:
 
 
 def parse_resume_async(application_id: uuid.UUID) -> None:
-    """提交后台线程解析;不阻塞申请提交。"""
+    """Kick off background parsing; never blocks submission."""
     threading.Thread(target=_parse, args=(application_id,), daemon=True).start()

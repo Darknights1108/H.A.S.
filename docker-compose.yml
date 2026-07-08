@@ -42,8 +42,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-ansonangzhenloong@gmail.com}
-      # 调试用:request-otp 响应直接带验证码(跳过读邮箱)。默认关闭 = 真实邮件流程;
-      # 跑自动化测试时可在 .env 设 DEBUG_EXPOSE_OTP=true 临时打开
+      # Debug: echo the OTP code in the request-otp response (skips reading email). Off by default = real email flow;
+      # for automated tests, temporarily set DEBUG_EXPOSE_OTP=true in .env
       DEBUG_EXPOSE_OTP: ${DEBUG_EXPOSE_OTP:-false}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: has
@@ -62,7 +62,7 @@ services:
     build:
       context: ./frontend
     environment:
-      # 留空 = 走 Next 同源代理(/api → backend),session cookie 才能工作
+      # empty = use the Next same-origin proxy (/api -> backend) so the session cookie works
       NEXT_PUBLIC_API_URL: ""
       BACKEND_URL: http://backend:8000
     ports:

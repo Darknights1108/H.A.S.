@@ -1,4 +1,4 @@
-"""MinIO 对象存储:简历文件的存取。生产环境把 endpoint 换成真 S3 即可。"""
+"""MinIO object storage for resume files. Point the endpoint at real S3 in production."""
 
 import io
 import logging

@@ -1,12 +1,12 @@
-"""职位管理 API(admin)。
+"""Jobs management API (admin).
 
-- POST /jobs            创建职位(带结构化打分规则)
-- PATCH /jobs/{id}      更新规则 / 开关职位
-- GET  /jobs/all        管理端列表(含已关闭 + 规则)
-- POST /jobs/parse      ★ chat box:把 JD 原文交给 Claude,解析成打分规则草稿
-                          (需 ANTHROPIC_API_KEY;无 key 返回 503,前端降级为手动填写)
+- POST /jobs            create a job (with structured screening rules)
+- PATCH /jobs/{id}      update rules / open-close the job
+- GET  /jobs/all        admin list (incl. closed jobs + rules)
+- POST /jobs/parse      * chat box: hand the raw JD to the LLM, get a screening-rule draft
+                          (needs an LLM key; returns 503 without one and the frontend falls back to manual entry)
 
-打分引擎按 job.requirements 动态执行,新职位创建后立即生效,无需改代码。
+The scoring engine executes job.requirements dynamically; new jobs take effect immediately, no code changes.
 """
 
 import logging
@@ -27,7 +27,7 @@ from ..services import llm
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-# 解析目标词汇表:必须与 services/scoring.py 的检查逻辑保持一致
+# Parse target vocabulary: must stay in sync with the checks in services/scoring.py
 PARSE_TOOL = {
     "name": "submit_screening_rules",
     "description": "Submit the screening rules extracted from the job description.",
@@ -94,7 +94,7 @@ PARSE_TOOL = {
 
 
 class ParseIn(BaseModel):
-    text: str = Field(min_length=20, description="JD 原文")
+    text: str = Field(min_length=20, description="raw JD text")
 
 
 @router.post("/parse")
@@ -190,7 +190,7 @@ def update_job(job_id: uuid.UUID, payload: JobPatch, db: Session = Depends(get_d
 @router.delete("/{job_id}")
 def delete_job(job_id: uuid.UUID, db: Session = Depends(get_db),
                _admin: UserSession = Depends(require_admin)) -> dict:
-    """删除职位。已有申请的职位不可删(数据完整性),请改为关闭。"""
+    """Delete a job. Jobs with applications cannot be deleted (data integrity) — close them instead."""
     job = db.get(Job, job_id)
     if job is None:
         raise HTTPException(404, "job not found")

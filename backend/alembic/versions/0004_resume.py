@@ -15,7 +15,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # resume_file_url 已存在(存 MinIO object key);这里加解析结果与状态
+    # resume_file_url already exists (MinIO object key); add parse result and status here
     op.execute(
         """
         ALTER TABLE application

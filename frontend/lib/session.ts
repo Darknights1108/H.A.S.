@@ -12,7 +12,7 @@ export type Session = {
   interviewer_id: string | null;
 };
 
-/** 管理页守卫:无有效会话跳 /login;requireAdmin 时非 admin 也跳走 */
+/** Admin-page guard: no valid session -> redirect to /login; with requireAdmin, non-admins are redirected too */
 export function useSession(requireAdmin = false) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
